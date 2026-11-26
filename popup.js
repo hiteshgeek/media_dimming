@@ -10,7 +10,7 @@ const DEFAULTS = {
 // Everything that makes up a "setting". Leaves out enabled and testMode,
 // which are operational switches rather than tuning.
 const TUNABLE = Object.keys(DEFAULTS).filter(k => k !== 'enabled' && k !== 'testMode');
-const META = { slots: [], userDefault: null, undoCfg: null };
+const META = { slots: [], undoCfg: null };
 const MAX_SLOTS = 5;
 
 const PRESETS = {
@@ -106,7 +106,7 @@ function render() {
   renderSlots();
 
   const hitSlot = MET.slots.findIndex(s => sameCfg(cfg, s.cfg));
-  const isDefault = MET.userDefault ? sameCfg(cfg, MET.userDefault) : sameCfg(cfg, DEFAULTS);
+  const isDefault = sameCfg(cfg, DEFAULTS);
   const saved = hitSlot >= 0 || isDefault || !!hitPreset;
 
   // The save row only appears when the current settings are not already
@@ -118,9 +118,8 @@ function render() {
   $('slotname').placeholder = full
     ? 'All ' + MAX_SLOTS + ' slots full — delete one'
     : 'Name these settings';
-  $('setdefault').hidden = isDefault;
   $('undo').hidden = !MET.undoCfg || sameCfg(cfg, MET.undoCfg);
-  $('minirow').hidden = $('setdefault').hidden && $('undo').hidden;
+  $('minirow').hidden = $('undo').hidden;
 }
 
 function renderSlots() {
@@ -203,12 +202,6 @@ $('save').addEventListener('click', async () => {
 });
 $('slotname').addEventListener('keydown', e => { if (e.key === 'Enter') $('save').click(); });
 
-$('setdefault').addEventListener('click', async () => {
-  await chrome.storage.sync.set({ userDefault: snap(CFG) });
-  await load();
-  flash('These are now your default. Reset will return here.');
-});
-
 $('undo').addEventListener('click', async () => {
   if (!MET.undoCfg) return;
   // the undo is itself undoable, so a mis-click costs nothing
@@ -217,8 +210,7 @@ $('undo').addEventListener('click', async () => {
   flash('Reverted.');
 });
 
-$('reset').addEventListener('click', () => applyWithUndo(MET.userDefault || snap(DEFAULTS)));
-$('factory').addEventListener('click', () => applyWithUndo(snap(DEFAULTS)));
+$('reset').addEventListener('click', () => applyWithUndo(snap(DEFAULTS)));
 
 // ---------- live meter ----------
 function setStatus(cls, text) {

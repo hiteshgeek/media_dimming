@@ -38,7 +38,7 @@
     areaComp: 0.55,     // how much to lower the ceiling as bright area grows
     maxContrast: 3,     // cap brightest pixel at N x the scene's own level (0 = off)
     minCeiling: 0.10,   // contrast adaptation never pushes below this
-    clipEngine: 'blend',// 'blend' = darken layer | 'filter' = SVG curve on the video
+    clipEngine: 'blend', // 'blend' = darken layer | 'filter' = SVG curve on the video
     flashCeil: 0.45,    // ceiling multiplier during a flash
     ceiling: 0.35,      // whole-frame mode: target average level
     maxDim: 0.80,       // whole-frame mode: how far gain may go
@@ -83,7 +83,10 @@
   let funcs = null;
 
   function buildFilter() {
-    if (funcs) return;
+    if (funcs) return true;
+    // A filter: url() pointing at a filter that does not exist makes the
+    // element not render at all, so never flag the class before this succeeds.
+    if (!document.body) return false;
     const NS = 'http://www.w3.org/2000/svg';
     const svg = document.createElementNS(NS, 'svg');
     svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
@@ -131,10 +134,9 @@
   function applyStatic() {
     root.classList.toggle('ml-active', !!cfg.enabled);
     if (!cfg.enabled) setGain(1);
-    const onFilter = cfg.enabled && cfg.mode === 'clip' && !cfg.testMode
-                     && cfg.clipEngine === 'filter';
-    if (onFilter) buildFilter();
-    root.classList.toggle('ml-clipfilter', onFilter);
+    const wantFilter = cfg.enabled && cfg.mode === 'clip' && !cfg.testMode
+                       && cfg.clipEngine === 'filter';
+    root.classList.toggle('ml-clipfilter', wantFilter && buildFilter());
     lastCeilByte = -1;
     if (!clipLayer) return;
     // Test mode always uses the overlay, since proving attachment is its job.
