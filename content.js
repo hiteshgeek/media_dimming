@@ -33,10 +33,10 @@
     enabled: true,
     mode: 'clip',       // 'clip' = per-pixel ceiling | 'dim' = global brightness
     testMode: false,
-    hardCeiling: 0.38,  // no pixel may exceed this
+    hardCeiling: 0.28,  // no pixel may exceed this
     clipStrength: 1.0,  // 1 = hard clip, lower = softer ratio
-    areaComp: 0.45,     // how much to lower the ceiling as bright area grows
-    maxContrast: 4,     // cap brightest pixel at N x the scene's own level (0 = off)
+    areaComp: 0.55,     // how much to lower the ceiling as bright area grows
+    maxContrast: 3,     // cap brightest pixel at N x the scene's own level (0 = off)
     minCeiling: 0.10,   // contrast adaptation never pushes below this
     clipEngine: 'blend',// 'blend' = darken layer | 'filter' = SVG curve on the video
     flashCeil: 0.45,    // ceiling multiplier during a flash

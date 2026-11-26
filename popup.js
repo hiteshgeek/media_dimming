@@ -1,7 +1,7 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
-  hardCeiling: 0.38, clipStrength: 1.0, areaComp: 0.45, flashCeil: 0.45,
-  maxContrast: 4, minCeiling: 0.10, clipEngine: 'blend',
+  hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
+  maxContrast: 3, minCeiling: 0.10, clipEngine: 'blend',
   ceiling: 0.35, maxDim: 0.80, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
   holdMs: 400, peakWeight: 0.45, sampleHz: 50
@@ -14,9 +14,9 @@ const META = { slots: [], userDefault: null, undoCfg: null };
 const MAX_SLOTS = 5;
 
 const PRESETS = {
-  gentle: { hardCeiling: 0.60, clipStrength: 0.85, areaComp: 0.30, maxContrast: 7, ceiling: 0.50, maxDim: 0.55, baseDim: 0.00 },
-  night:  { hardCeiling: 0.38, clipStrength: 1.00, areaComp: 0.45, maxContrast: 4, ceiling: 0.35, maxDim: 0.80, baseDim: 0.00 },
-  strict: { hardCeiling: 0.24, clipStrength: 1.00, areaComp: 0.60, maxContrast: 2.5, ceiling: 0.22, maxDim: 0.88, baseDim: 0.10 }
+  gentle: { hardCeiling: 0.45, clipStrength: 0.90, areaComp: 0.40, maxContrast: 5, ceiling: 0.42, maxDim: 0.65, baseDim: 0.00 },
+  night:  { hardCeiling: 0.28, clipStrength: 1.00, areaComp: 0.55, maxContrast: 3, ceiling: 0.30, maxDim: 0.82, baseDim: 0.00 },
+  strict: { hardCeiling: 0.18, clipStrength: 1.00, areaComp: 0.65, maxContrast: 2, ceiling: 0.20, maxDim: 0.90, baseDim: 0.08 }
 };
 
 // id -> [slider value to stored, stored to slider value, label text]
