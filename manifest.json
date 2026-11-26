@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Media Layer — Brightness Limiter",
+  "version": "1.0.0",
+  "description": "Adaptive brightness limiter for YouTube. Darkens blinding white frames and flashes in real time, like an audio limiter for light.",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://m.youtube.com/*",
+    "https://www.youtube-nocookie.com/*"
+  ],
+  "background": { "service_worker": "background.js" },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://m.youtube.com/*",
+        "https://www.youtube-nocookie.com/*"
+      ],
+      "js": ["content.js"],
+      "css": ["overlay.css"],
+      "run_at": "document_start",
+      "all_frames": true
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Media Layer"
+  },
+  "commands": {
+    "toggle-enabled": {
+      "suggested_key": { "default": "Alt+Shift+D" },
+      "description": "Turn Media Layer on/off"
+    },
+    "nudge-darker": {
+      "suggested_key": { "default": "Alt+Shift+Down" },
+      "description": "Dim more"
+    },
+    "nudge-lighter": {
+      "suggested_key": { "default": "Alt+Shift+Up" },
+      "description": "Dim less"
+    }
+  }
+}

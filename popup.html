@@ -1,0 +1,116 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root { color-scheme: dark; }
+  body {
+    width: 318px; margin: 0; padding: 14px 15px 16px;
+    background: #15161a; color: #d8dae0;
+    font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  h1 { font-size: 13px; margin: 0 0 2px; letter-spacing: .02em; }
+  .sub { font-size: 11px; color: #777b86; margin: 0 0 12px; }
+
+  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 3px; }
+  label { font-size: 12px; color: #b4b8c2; }
+  .val { font-size: 11px; color: #6f7480; font-variant-numeric: tabular-nums; }
+  .hint { font-size: 10.5px; color: #626774; margin: 1px 0 0; }
+
+  input[type=range] { width: 100%; margin: 0; accent-color: #6b8afd; height: 18px; }
+  .switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+  input[type=checkbox] { accent-color: #6b8afd; width: 15px; height: 15px; }
+
+  .bar { height: 6px; border-radius: 3px; background: #26282f; overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; width: 0%; transition: width .1s linear; }
+  .lumfill { background: linear-gradient(90deg,#6a4a3a,#ffb46b); }
+  .showfill { background: linear-gradient(90deg,#3b4a7a,#8fa6ff); }
+  .tiny { font-size: 10.5px; color: #6f7480; display: flex; justify-content: space-between; }
+
+  .presets { display: flex; gap: 6px; margin: 11px 0 2px; }
+  .presets button { flex: 1; }
+  button {
+    padding: 6px 4px; border-radius: 6px; cursor: pointer;
+    background: #22242b; color: #aeb2bc; border: 1px solid #31343d; font-size: 11.5px;
+  }
+  button:hover { background: #2d303a; color: #d8dae0; }
+  button.sel { background: #2f3f72; border-color: #4a63ad; color: #dbe3ff; }
+  #reset { width: 100%; margin-top: 11px; }
+
+  hr { border: 0; border-top: 1px solid #262830; margin: 14px 0 2px; }
+  .note { font-size: 10.5px; color: #686d79; margin-top: 10px; }
+  .off { opacity: .4; pointer-events: none; }
+</style>
+</head>
+<body>
+  <h1>Media Layer</h1>
+  <p class="sub">Brightness limiter for YouTube</p>
+
+  <label class="switch"><input type="checkbox" id="enabled"><span>Enabled <span class="val">(Alt+Shift+D)</span></span></label>
+
+  <div id="panel">
+    <div class="presets" style="margin-top:12px">
+      <button id="m-clip">Selective</button>
+      <button id="m-dim">Whole frame</button>
+    </div>
+    <p class="hint">Selective caps only the bright pixels and leaves dark areas alone.</p>
+
+    <div class="presets">
+      <button id="p-gentle">Gentle</button>
+      <button id="p-night">Night</button>
+      <button id="p-strict">Strict</button>
+    </div>
+
+    <div class="tiny" style="margin-top:10px"><span>Video is actually</span><span id="lumv">—</span></div>
+    <div class="bar"><i class="lumfill" id="lumbar"></i></div>
+    <div class="tiny" style="margin-top:7px"><span>You are seeing</span><span id="showv">—</span></div>
+    <div class="bar"><i class="showfill" id="showbar"></i></div>
+    <div class="tiny" id="areav" style="margin-top:7px"></div>
+    <div class="tiny" id="status" style="margin-top:4px"></div>
+
+    <hr>
+
+    <div class="row"><label for="hardCeiling">Brightness ceiling</label><span class="val" id="hardCeilingv"></span></div>
+    <input type="range" id="hardCeiling" min="8" max="100" step="1">
+    <p class="hint">Hard cap. Nothing on screen may exceed this. Dark areas are untouched.</p>
+
+    <div class="row"><label for="clipStrength">Clip hardness</label><span class="val" id="clipStrengthv"></span></div>
+    <input type="range" id="clipStrength" min="20" max="100" step="1">
+    <p class="hint">Softer keeps more detail in bright areas but lets more light through.</p>
+
+    <div class="row"><label for="areaComp">Large bright areas</label><span class="val" id="areaCompv"></span></div>
+    <input type="range" id="areaComp" min="0" max="90" step="1">
+    <p class="hint">Lowers the ceiling further as more of the frame goes bright. A full white screen floods the eye even when its peak is capped.</p>
+
+    <hr>
+    <p class="hint" style="margin-bottom:0">Below applies to Whole frame mode only.</p>
+
+    <div class="row"><label for="ceiling">Average scene target</label><span class="val" id="ceilingv"></span></div>
+    <input type="range" id="ceiling" min="10" max="95" step="1">
+
+    <div class="row"><label for="maxDim">Maximum extra dimming</label><span class="val" id="maxDimv"></span></div>
+    <input type="range" id="maxDim" min="0" max="90" step="1">
+
+    <div class="row"><label for="baseDim">Always-on dim</label><span class="val" id="baseDimv"></span></div>
+    <input type="range" id="baseDim" min="0" max="60" step="1">
+
+    <div class="row"><label for="releaseMs">Recovery speed</label><span class="val" id="releaseMsv"></span></div>
+    <input type="range" id="releaseMs" min="300" max="4000" step="50">
+
+    <hr>
+    <div class="row" style="margin-bottom:0">
+      <label class="switch"><input type="checkbox" id="flashGuard"><span>Flash guard</span></label>
+      <span class="val" id="flashDeltav"></span>
+    </div>
+    <input type="range" id="flashDelta" min="4" max="40" step="1">
+
+    <label class="switch" style="margin-top:13px"><input type="checkbox" id="testMode"><span>Test mode (red wash)</span></label>
+    <p class="hint">Turns the layer bright red. If you see red over the video, it is attached.</p>
+
+    <button id="reset">Reset to defaults</button>
+    <p class="note">Dims the picture only — subtitles and player controls stay at full brightness.</p>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

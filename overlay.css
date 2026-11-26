@@ -1,0 +1,24 @@
+/* Primary mechanism: the gain is a brightness filter on the video element
+   itself, driven by a custom property. Injected content-script CSS always
+   applies, so this does not depend on YouTube's DOM structure at all. */
+html.ml-active video {
+  filter: brightness(var(--ml-gain, 1)) !important;
+}
+
+/* Optional ceiling layer: `darken` composites to min(video, grey) per channel,
+   a hard brickwall on highlights that leaves dark pixels untouched. */
+.ml-clip-layer {
+  position: absolute;
+  inset: 0;
+  background: #616161;
+  mix-blend-mode: darken;
+  pointer-events: none;
+  z-index: 2;
+}
+
+/* Test mode: unmistakable red wash, to prove the layer is actually attached. */
+.ml-clip-layer.ml-test {
+  background: #ff2200 !important;
+  mix-blend-mode: normal !important;
+  opacity: 0.4 !important;
+}
