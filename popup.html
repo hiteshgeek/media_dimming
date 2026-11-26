@@ -279,6 +279,12 @@
       <div class="dbody">
 
       <div class="ctl only-clip">
+        <div class="lbl"><label for="maxContrast">Dark scene limit</label><span class="v" id="maxContrastv"></span></div>
+        <input type="range" id="maxContrast" min="0" max="120" step="1">
+        <p class="hint">Holds the brightest pixel to a multiple of the scene's own level, so white titles on a dark shot cannot glare. Lower is stricter.</p>
+      </div>
+
+      <div class="ctl only-clip">
         <div class="lbl"><label for="areaComp">Large bright areas</label><span class="v" id="areaCompv"></span></div>
         <input type="range" id="areaComp" min="0" max="90" step="1">
         <p class="hint">Tightens the ceiling as more of the frame goes bright.</p>
@@ -315,6 +321,14 @@
           <span class="tgl-l">Test mode</span>
         </label>
         <p class="hint">Washes the layer bright red. If you see red over the video, it is attached.</p>
+
+        <p class="sect-t" style="margin-top:13px">Clip engine</p>
+        <div class="seg" id="seg2" data-sel="0">
+          <button id="e-blend">Blend layer</button>
+          <button id="e-filter">Video filter</button>
+        </div>
+        <p class="hint">Switch to Video filter if bright areas go undimmed — it applies the curve to the video itself instead of compositing a layer over it.</p>
+
         <button class="btn" id="reset" style="margin-top:11px">Reset all to defaults</button>
       </div>
     </details>

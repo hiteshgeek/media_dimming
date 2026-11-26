@@ -1,15 +1,16 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   hardCeiling: 0.38, clipStrength: 1.0, areaComp: 0.45, flashCeil: 0.45,
+  maxContrast: 4, minCeiling: 0.10, clipEngine: 'blend',
   ceiling: 0.35, maxDim: 0.80, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
   holdMs: 400, peakWeight: 0.45, sampleHz: 50
 };
 
 const PRESETS = {
-  gentle: { hardCeiling: 0.60, clipStrength: 0.85, areaComp: 0.30, ceiling: 0.50, maxDim: 0.55, baseDim: 0.00 },
-  night:  { hardCeiling: 0.38, clipStrength: 1.00, areaComp: 0.45, ceiling: 0.35, maxDim: 0.80, baseDim: 0.00 },
-  strict: { hardCeiling: 0.24, clipStrength: 1.00, areaComp: 0.60, ceiling: 0.22, maxDim: 0.88, baseDim: 0.10 }
+  gentle: { hardCeiling: 0.60, clipStrength: 0.85, areaComp: 0.30, maxContrast: 7, ceiling: 0.50, maxDim: 0.55, baseDim: 0.00 },
+  night:  { hardCeiling: 0.38, clipStrength: 1.00, areaComp: 0.45, maxContrast: 4, ceiling: 0.35, maxDim: 0.80, baseDim: 0.00 },
+  strict: { hardCeiling: 0.24, clipStrength: 1.00, areaComp: 0.60, maxContrast: 2.5, ceiling: 0.22, maxDim: 0.88, baseDim: 0.10 }
 };
 
 // id -> [slider value to stored, stored to slider value, label text]
@@ -17,6 +18,7 @@ const SLIDERS = {
   hardCeiling:  [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   clipStrength: [v => v / 100, v => Math.round(v * 100), v => v >= 0.98 ? 'hard clip' : (1 / (1 - v)).toFixed(1) + ':1'],
   areaComp:     [v => v / 100, v => Math.round(v * 100), v => v <= 0.01 ? 'off' : Math.round(v * 100) + '%'],
+  maxContrast:  [v => v / 10,  v => Math.round(v * 10),  v => v <= 0.05 ? 'off' : v.toFixed(1) + '× scene'],
   ceiling:      [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   maxDim:       [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   baseDim:      [v => v / 100, v => Math.round(v * 100), v => v <= 0.005 ? 'off' : Math.round(v * 100) + '%'],
@@ -41,6 +43,9 @@ function render(cfg) {
   $('enabled').checked = cfg.enabled;
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
+  $('e-blend').classList.toggle('sel', cfg.clipEngine !== 'filter');
+  $('e-filter').classList.toggle('sel', cfg.clipEngine === 'filter');
+  $('seg2').dataset.sel = cfg.clipEngine === 'filter' ? '1' : '0';
 
   document.body.dataset.mode = cfg.mode;
   $('seg').dataset.sel = cfg.mode === 'dim' ? '1' : '0';
@@ -89,6 +94,10 @@ const setMode = async (mode) => { await chrome.storage.sync.set({ mode }); reloa
 $('m-clip').addEventListener('click', () => setMode('clip'));
 $('m-dim').addEventListener('click', () => setMode('dim'));
 
+const setEngine = async (clipEngine) => { await chrome.storage.sync.set({ clipEngine }); reload(); };
+$('e-blend').addEventListener('click', () => setEngine('blend'));
+$('e-filter').addEventListener('click', () => setEngine('filter'));
+
 for (const name of Object.keys(PRESETS)) {
   $('p-' + name).addEventListener('click', async () => { await chrome.storage.sync.set(PRESETS[name]); reload(); });
 }
@@ -123,7 +132,7 @@ async function poll() {
 
     $('areav').textContent = !r.hasVideo ? ''
       : r.selective
-        ? pct(r.brightArea) + '% of the frame is over the ceiling, capped at ' + pct(r.ceiling) + '%'
+        ? pct(r.brightArea) + '% over ceiling · scene level ' + pct(r.ambient) + '% · capped at ' + pct(r.ceiling) + '%'
         : 'Whole frame dimmed by ' + pct(r.dim) + '%';
 
     if (!r.hasVideo) setStatus('', 'No video on this tab');

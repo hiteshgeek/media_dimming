@@ -5,6 +5,12 @@ html.ml-active video {
   filter: brightness(var(--ml-gain, 1)) !important;
 }
 
+/* Filter clip engine: a transfer curve on the video itself, for cases where a
+   blended overlay never reaches the video. Must follow the rule above. */
+html.ml-active.ml-clipfilter video {
+  filter: brightness(var(--ml-gain, 1)) url(#ml-clip) !important;
+}
+
 /* Optional ceiling layer: `darken` composites to min(video, grey) per channel,
    a hard brickwall on highlights that leaves dark pixels untouched. */
 .ml-clip-layer {

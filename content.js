@@ -36,6 +36,9 @@
     hardCeiling: 0.38,  // no pixel may exceed this
     clipStrength: 1.0,  // 1 = hard clip, lower = softer ratio
     areaComp: 0.45,     // how much to lower the ceiling as bright area grows
+    maxContrast: 4,     // cap brightest pixel at N x the scene's own level (0 = off)
+    minCeiling: 0.10,   // contrast adaptation never pushes below this
+    clipEngine: 'blend',// 'blend' = darken layer | 'filter' = SVG curve on the video
     flashCeil: 0.45,    // ceiling multiplier during a flash
     ceiling: 0.35,      // whole-frame mode: target average level
     maxDim: 0.80,       // whole-frame mode: how far gain may go
@@ -52,7 +55,7 @@
   let cfg = { ...DEFAULTS };
   const state = {
     lum: 0, shown: 0, gain: 1, target: 1,
-    ceilMul: 1, ceilTarget: 1, effCeiling: 1, brightArea: 0,
+    ceilMul: 1, ceilTarget: 1, effCeiling: 1, brightArea: 0, ambient: 0,
     blackFrames: 0, hasVideo: false, readable: true, attached: false
   };
   let announced = false;
@@ -69,24 +72,73 @@
 
   function setGain(g) { root.style.setProperty('--ml-gain', g.toFixed(3)); }
 
+  // Second clip engine: an SVG transfer curve applied to the video element
+  // itself. Same path as the brightness filter, so it survives cases where a
+  // blended overlay does not reach the video (hardware overlay planes,
+  // fullscreen compositing, a stacking context we did not anticipate).
+  const NT = 17;   // table points; piecewise-linear between them
+  let funcs = null;
+
+  function buildFilter() {
+    if (funcs) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
+    svg.setAttribute('aria-hidden', 'true');
+    svg.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none';
+    const f = document.createElementNS(NS, 'filter');
+    f.setAttribute('id', 'ml-clip');
+    // sRGB, not the linearRGB default, so the curve matches the blend maths
+    f.setAttribute('color-interpolation-filters', 'sRGB');
+    const ct = document.createElementNS(NS, 'feComponentTransfer');
+    funcs = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
+      const fn = document.createElementNS(NS, tag);
+      fn.setAttribute('type', 'table');
+      ct.appendChild(fn);
+      return fn;
+    });
+    f.appendChild(ct); svg.appendChild(f);
+    (document.body || document.documentElement).appendChild(svg);
+  }
+
+  function filterTable(c, s) {
+    const out = [];
+    for (let k = 0; k < NT; k++) {
+      const x = k / (NT - 1);
+      out.push((x * (1 - s) + Math.min(x, c) * s).toFixed(4));
+    }
+    return out.join(' ');
+  }
+
   let lastCeilByte = -1;
   function setCeiling(c) {
-    if (!clipLayer) return;
     const b = Math.round(clamp(c, 0.02, 1) * 255);
     if (b === lastCeilByte) return;          // avoid redundant style writes
     lastCeilByte = b;
-    clipLayer.style.backgroundColor = 'rgb(' + b + ',' + b + ',' + b + ')';
+    if (cfg.clipEngine === 'filter') {
+      buildFilter();
+      const tv = filterTable(b / 255, clamp(cfg.clipStrength, 0, 1));
+      for (const fn of funcs) fn.setAttribute('tableValues', tv);
+    } else if (clipLayer) {
+      clipLayer.style.backgroundColor = 'rgb(' + b + ',' + b + ',' + b + ')';
+    }
   }
 
   // Everything that depends only on settings, not on the current frame.
   function applyStatic() {
     root.classList.toggle('ml-active', !!cfg.enabled);
     if (!cfg.enabled) setGain(1);
-    if (!clipLayer) return;
-    const useClip = cfg.enabled && (cfg.mode === 'clip' || cfg.testMode);
-    clipLayer.classList.toggle('ml-test', !!cfg.testMode);
-    clipLayer.style.opacity = useClip ? clamp(cfg.clipStrength, 0, 1).toFixed(3) : '0';
+    const onFilter = cfg.enabled && cfg.mode === 'clip' && !cfg.testMode
+                     && cfg.clipEngine === 'filter';
+    if (onFilter) buildFilter();
+    root.classList.toggle('ml-clipfilter', onFilter);
     lastCeilByte = -1;
+    if (!clipLayer) return;
+    // Test mode always uses the overlay, since proving attachment is its job.
+    const useLayer = cfg.enabled && cfg.clipEngine !== 'filter'
+                     && (cfg.mode === 'clip' || cfg.testMode) || (cfg.enabled && cfg.testMode);
+    clipLayer.classList.toggle('ml-test', !!cfg.testMode);
+    clipLayer.style.opacity = useLayer ? clamp(cfg.clipStrength, 0, 1).toFixed(3) : '0';
   }
 
   // ---- frame sampling -------------------------------------------------
@@ -119,6 +171,14 @@
     for (let b = 63; b >= 0; b--) { acc += hist[b]; if (acc >= want) { bin = b; break; } }
 
     return { raw: sum / n, peak: (bin + 0.5) / 64, n };
+  }
+
+  // The scene's own working level. Median, not mean, so a small patch of
+  // blazing text cannot drag it upwards and excuse itself.
+  function medianLuma(n) {
+    let acc = 0; const half = n * 0.5;
+    for (let b = 0; b < 64; b++) { acc += hist[b]; if (acc >= half) return (b + 0.5) / 64; }
+    return 1;
   }
 
   // Fraction of the frame above a level, and the mean once clipped to it.
@@ -227,6 +287,18 @@
           const st = clipStats(cfg.hardCeiling, s.n);
           state.brightArea = st.frac;
           let cm = 1 - clamp(cfg.areaComp, 0, 0.9) * st.frac;
+
+          // Dark-scene adaptation. An absolute cap is the wrong measure on a
+          // dark shot: your eyes are adapted to the gloom, so white titles at
+          // the ceiling are still a glare. Hold the brightest pixel to a fixed
+          // multiple of the scene's own level instead.
+          if (cfg.maxContrast > 0) {
+            const amb = medianLuma(s.n);
+            state.ambient = amb;
+            const lim = Math.max(cfg.minCeiling, amb * cfg.maxContrast);
+            cm = Math.min(cm, clamp(lim / cfg.hardCeiling, 0.05, 1));
+          }
+
           if (holding) cm = Math.min(cm, clamp(cfg.flashCeil, 0.1, 1));
           state.ceilTarget = cm;
           state.target = 1 - clamp(cfg.baseDim, 0, 0.6);
@@ -272,9 +344,11 @@
     if (msg && msg.type === 'ml-status') {
       respond({
         hasVideo: state.hasVideo,
-        attached: state.attached,
+        attached: cfg.clipEngine === 'filter' ? !!funcs : state.attached,
         readable: state.readable,
         selective: cfg.mode === 'clip',
+        engine: cfg.clipEngine,
+        ambient: state.ambient,
         lum: state.lum,
         shown: state.shown,
         ceiling: state.effCeiling,
