@@ -113,6 +113,7 @@ function render() {
   // the default, a built-in preset, or one of the saved slots.
   const full = MET.slots.length >= MAX_SLOTS;
   $('saverow').hidden = saved;
+  $('whysave').hidden = saved;
   $('save').disabled = full;
   $('slotname').disabled = full;
   $('slotname').placeholder = full
