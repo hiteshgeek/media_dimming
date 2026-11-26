@@ -63,7 +63,10 @@
   chrome.storage.sync.get(DEFAULTS, (v) => { cfg = { ...DEFAULTS, ...v }; applyStatic(); });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
-    for (const k of Object.keys(changes)) cfg[k] = changes[k].newValue;
+    // Only known settings; the popup also stores slots and undo state here.
+    for (const k of Object.keys(changes)) {
+      if (k in DEFAULTS) cfg[k] = changes[k].newValue;
+    }
     applyStatic();
   });
 

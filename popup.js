@@ -7,6 +7,12 @@ const DEFAULTS = {
   holdMs: 400, peakWeight: 0.45, sampleHz: 50
 };
 
+// Everything that makes up a "setting". Leaves out enabled and testMode,
+// which are operational switches rather than tuning.
+const TUNABLE = Object.keys(DEFAULTS).filter(k => k !== 'enabled' && k !== 'testMode');
+const META = { slots: [], userDefault: null, undoCfg: null };
+const MAX_SLOTS = 5;
+
 const PRESETS = {
   gentle: { hardCeiling: 0.60, clipStrength: 0.85, areaComp: 0.30, maxContrast: 7, ceiling: 0.50, maxDim: 0.55, baseDim: 0.00 },
   night:  { hardCeiling: 0.38, clipStrength: 1.00, areaComp: 0.45, maxContrast: 4, ceiling: 0.35, maxDim: 0.80, baseDim: 0.00 },
@@ -17,8 +23,8 @@ const PRESETS = {
 const SLIDERS = {
   hardCeiling:  [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   clipStrength: [v => v / 100, v => Math.round(v * 100), v => v >= 0.98 ? 'hard clip' : (1 / (1 - v)).toFixed(1) + ':1'],
-  areaComp:     [v => v / 100, v => Math.round(v * 100), v => v <= 0.01 ? 'off' : Math.round(v * 100) + '%'],
   maxContrast:  [v => v / 10,  v => Math.round(v * 10),  v => v <= 0.05 ? 'off' : v.toFixed(1) + '× scene'],
+  areaComp:     [v => v / 100, v => Math.round(v * 100), v => v <= 0.01 ? 'off' : Math.round(v * 100) + '%'],
   ceiling:      [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   maxDim:       [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   baseDim:      [v => v / 100, v => Math.round(v * 100), v => v <= 0.005 ? 'off' : Math.round(v * 100) + '%'],
@@ -27,33 +33,66 @@ const SLIDERS = {
 };
 
 const $ = id => document.getElementById(id);
+const snap = c => Object.fromEntries(TUNABLE.map(k => [k, c[k]]));
 
-// Paint the filled portion of a range input via the --p custom property.
+function sameCfg(a, b) {
+  if (!a || !b) return false;
+  return TUNABLE.every(k => {
+    const x = a[k], y = b[k];
+    return (typeof x === 'number' && typeof y === 'number') ? Math.abs(x - y) < 0.005 : x === y;
+  });
+}
+// A built-in preset only names some keys, so compare just those.
+const matchesPreset = (cfg, p) =>
+  Object.entries(p).every(([k, v]) => Math.abs(cfg[k] - v) < 0.005);
+
 function fill(el) {
   const min = +el.min, max = +el.max;
   el.style.setProperty('--p', ((+el.value - min) / (max - min) * 100).toFixed(1) + '%');
 }
 
-function matchingPreset(cfg) {
-  return Object.keys(PRESETS).find(name =>
-    Object.entries(PRESETS[name]).every(([k, v]) => Math.abs(cfg[k] - v) < 0.005)) || null;
+// ---------- state ----------
+let CFG = { ...DEFAULTS }, MET = { ...META };
+
+async function load() {
+  CFG = await chrome.storage.sync.get(DEFAULTS);
+  MET = await chrome.storage.sync.get(META);
+  render();
 }
 
-function render(cfg) {
+// Every action that replaces settings wholesale stashes the old ones first,
+// so a reset or preset can always be walked back.
+async function applyWithUndo(patch) {
+  await chrome.storage.sync.set({ undoCfg: snap(CFG), ...patch });
+  await load();
+  flash('');
+}
+
+function flash(msg) {
+  const n = $('savednote');
+  n.textContent = msg;
+  n.hidden = !msg;
+  if (msg) setTimeout(() => { n.hidden = true; }, 2200);
+}
+
+// ---------- render ----------
+function render() {
+  const cfg = CFG;
   $('enabled').checked = cfg.enabled;
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
-  $('e-blend').classList.toggle('sel', cfg.clipEngine !== 'filter');
-  $('e-filter').classList.toggle('sel', cfg.clipEngine === 'filter');
-  $('seg2').dataset.sel = cfg.clipEngine === 'filter' ? '1' : '0';
 
   document.body.dataset.mode = cfg.mode;
   $('seg').dataset.sel = cfg.mode === 'dim' ? '1' : '0';
   $('m-clip').classList.toggle('sel', cfg.mode === 'clip');
   $('m-dim').classList.toggle('sel', cfg.mode === 'dim');
 
-  const hit = matchingPreset(cfg);
-  for (const name of Object.keys(PRESETS)) $('p-' + name).classList.toggle('sel', name === hit);
+  $('e-blend').classList.toggle('sel', cfg.clipEngine !== 'filter');
+  $('e-filter').classList.toggle('sel', cfg.clipEngine === 'filter');
+  $('seg2').dataset.sel = cfg.clipEngine === 'filter' ? '1' : '0';
+
+  const hitPreset = Object.keys(PRESETS).find(n => matchesPreset(cfg, PRESETS[n])) || null;
+  for (const n of Object.keys(PRESETS)) $('p-' + n).classList.toggle('sel', n === hitPreset);
 
   for (const id of Object.keys(SLIDERS)) {
     const [, toSlider, fmt] = SLIDERS[id];
@@ -63,47 +102,125 @@ function render(cfg) {
     $(id + 'v').textContent = fmt(cfg[id]);
   }
   $('panel').classList.toggle('off', !cfg.enabled);
+
+  renderSlots();
+
+  const hitSlot = MET.slots.findIndex(s => sameCfg(cfg, s.cfg));
+  const isDefault = MET.userDefault ? sameCfg(cfg, MET.userDefault) : sameCfg(cfg, DEFAULTS);
+  const saved = hitSlot >= 0 || isDefault || !!hitPreset;
+
+  // The save row only appears when the current settings are not already
+  // the default, a built-in preset, or one of the saved slots.
+  const full = MET.slots.length >= MAX_SLOTS;
+  $('saverow').hidden = saved;
+  $('save').disabled = full;
+  $('slotname').disabled = full;
+  $('slotname').placeholder = full
+    ? 'All ' + MAX_SLOTS + ' slots full — delete one'
+    : 'Name these settings';
+  $('setdefault').hidden = isDefault;
+  $('undo').hidden = !MET.undoCfg || sameCfg(cfg, MET.undoCfg);
+  $('minirow').hidden = $('setdefault').hidden && $('undo').hidden;
 }
 
-const reload = () => chrome.storage.sync.get(DEFAULTS, render);
-reload();
+function renderSlots() {
+  const box = $('slots');
+  box.textContent = '';
+  MET.slots.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slot' + (sameCfg(CFG, s.cfg) ? ' sel' : '');
+    el.title = 'Load "' + s.name + '"';
 
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = s.name;
+    nm.addEventListener('click', () => applyWithUndo(s.cfg));
+
+    const x = document.createElement('span');
+    x.className = 'x';
+    x.textContent = '×';
+    x.title = 'Delete "' + s.name + '"';
+    x.addEventListener('click', async (ev) => {
+      ev.stopPropagation();
+      const slots = MET.slots.slice();
+      slots.splice(i, 1);
+      await chrome.storage.sync.set({ slots });
+      await load();
+    });
+
+    el.append(nm, x);
+    box.appendChild(el);
+  });
+}
+
+// ---------- wiring ----------
 for (const id of Object.keys(SLIDERS)) {
-  $(id).addEventListener('input', (e) => {
+  $(id).addEventListener('input', async (e) => {
     const [toStore, , fmt] = SLIDERS[id];
     const stored = toStore(+e.target.value);
     fill(e.target);
     $(id + 'v').textContent = fmt(stored);
-    chrome.storage.sync.set({ [id]: stored });
-    // a manual tweak means it is no longer exactly a preset
-    chrome.storage.sync.get(DEFAULTS, (c) => {
-      const hit = matchingPreset(c);
-      for (const n of Object.keys(PRESETS)) $('p-' + n).classList.toggle('sel', n === hit);
-    });
+    CFG[id] = stored;
+    await chrome.storage.sync.set({ [id]: stored });
+    render();
   });
 }
 
-$('enabled').addEventListener('change', (e) => {
-  chrome.storage.sync.set({ enabled: e.target.checked });
+$('enabled').addEventListener('change', async (e) => {
+  CFG.enabled = e.target.checked;
+  await chrome.storage.sync.set({ enabled: e.target.checked });
   $('panel').classList.toggle('off', !e.target.checked);
 });
-$('flashGuard').addEventListener('change', e => chrome.storage.sync.set({ flashGuard: e.target.checked }));
-$('testMode').addEventListener('change', e => chrome.storage.sync.set({ testMode: e.target.checked }));
+$('flashGuard').addEventListener('change', async (e) => {
+  CFG.flashGuard = e.target.checked;
+  await chrome.storage.sync.set({ flashGuard: e.target.checked });
+  render();
+});
+$('testMode').addEventListener('change', async (e) => {
+  CFG.testMode = e.target.checked;
+  await chrome.storage.sync.set({ testMode: e.target.checked });
+});
 
-const setMode = async (mode) => { await chrome.storage.sync.set({ mode }); reload(); };
-$('m-clip').addEventListener('click', () => setMode('clip'));
-$('m-dim').addEventListener('click', () => setMode('dim'));
-
-const setEngine = async (clipEngine) => { await chrome.storage.sync.set({ clipEngine }); reload(); };
-$('e-blend').addEventListener('click', () => setEngine('blend'));
-$('e-filter').addEventListener('click', () => setEngine('filter'));
+const setKey = async (k, v) => { CFG[k] = v; await chrome.storage.sync.set({ [k]: v }); render(); };
+$('m-clip').addEventListener('click', () => setKey('mode', 'clip'));
+$('m-dim').addEventListener('click', () => setKey('mode', 'dim'));
+$('e-blend').addEventListener('click', () => setKey('clipEngine', 'blend'));
+$('e-filter').addEventListener('click', () => setKey('clipEngine', 'filter'));
 
 for (const name of Object.keys(PRESETS)) {
-  $('p-' + name).addEventListener('click', async () => { await chrome.storage.sync.set(PRESETS[name]); reload(); });
+  $('p-' + name).addEventListener('click', () => applyWithUndo(PRESETS[name]));
 }
-$('reset').addEventListener('click', async () => { await chrome.storage.sync.set(DEFAULTS); reload(); });
 
-// ---- live meter ----
+$('save').addEventListener('click', async () => {
+  if (MET.slots.length >= MAX_SLOTS) return;
+  const typed = $('slotname').value.trim();
+  const name = typed || 'Preset ' + (MET.slots.length + 1);
+  const slots = MET.slots.concat([{ name, cfg: snap(CFG) }]);
+  await chrome.storage.sync.set({ slots });
+  $('slotname').value = '';
+  await load();
+  flash('Saved as "' + name + '".');
+});
+$('slotname').addEventListener('keydown', e => { if (e.key === 'Enter') $('save').click(); });
+
+$('setdefault').addEventListener('click', async () => {
+  await chrome.storage.sync.set({ userDefault: snap(CFG) });
+  await load();
+  flash('These are now your default. Reset will return here.');
+});
+
+$('undo').addEventListener('click', async () => {
+  if (!MET.undoCfg) return;
+  // the undo is itself undoable, so a mis-click costs nothing
+  await chrome.storage.sync.set({ ...MET.undoCfg, undoCfg: snap(CFG) });
+  await load();
+  flash('Reverted.');
+});
+
+$('reset').addEventListener('click', () => applyWithUndo(MET.userDefault || snap(DEFAULTS)));
+$('factory').addEventListener('click', () => applyWithUndo(snap(DEFAULTS)));
+
+// ---------- live meter ----------
 function setStatus(cls, text) {
   $('status').innerHTML = '<span class="dot ' + cls + '"></span>' + text;
 }
@@ -121,7 +238,6 @@ async function poll() {
     $('lumv').textContent = pct(r.lum) + '%';
     $('showv').textContent = pct(r.shown) + '%';
 
-    // tick on the source meter showing where the ceiling currently sits
     const mark = $('ceilmark');
     if (r.selective && r.hasVideo) {
       mark.style.left = pct(r.ceiling) + '%';
@@ -145,5 +261,7 @@ async function poll() {
     setStatus('', 'Not connected — open or reload a YouTube tab');
   }
 }
+
+load();
 poll();
 setInterval(poll, 160);

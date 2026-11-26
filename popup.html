@@ -93,6 +93,51 @@
 
   /* ---------- preset chips ---------- */
   .chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+
+  /* ---------- saved slots ---------- */
+  .slots { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 7px; }
+  .slots:empty { display: none; }
+  .slot {
+    display: inline-flex; align-items: center; gap: 5px;
+    background: var(--card); border: 1px solid var(--line); border-radius: 8px;
+    padding: 5px 6px 5px 9px; cursor: pointer; font: inherit; font-size: 11.5px;
+    color: var(--txt-2); transition: all .16s; max-width: 100%;
+  }
+  .slot:hover { background: var(--card-2); color: var(--txt); border-color: var(--line-2); }
+  .slot.sel { background: rgba(127,156,255,.14); border-color: rgba(127,156,255,.55); color: #cfd9ff; }
+  .slot .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 108px; }
+  .slot .x {
+    flex: none; width: 15px; height: 15px; line-height: 13px; text-align: center;
+    border-radius: 4px; color: var(--txt-3); font-size: 13px;
+  }
+  .slot .x:hover { background: #4a2b2e; color: #ff9a92; }
+
+  .saverow { display: flex; gap: 6px; margin-top: 7px; }
+  .saverow[hidden] { display: none; }
+  .saverow input {
+    flex: 1; min-width: 0; background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 9px; color: var(--txt); font: inherit; font-size: 11.5px;
+  }
+  .saverow input::placeholder { color: var(--txt-3); }
+  .saverow input:focus { outline: none; border-color: var(--acc); }
+  .saverow button {
+    flex: none; padding: 6px 13px; border-radius: 8px; cursor: pointer; font: inherit;
+    font-size: 11.5px; font-weight: 500; color: #fff; border: 1px solid var(--acc);
+    background: linear-gradient(180deg, #6d85ec, #5469cc);
+  }
+  .saverow button:hover { filter: brightness(1.12); }
+  .saverow button:disabled { opacity: .45; cursor: default; filter: none; }
+
+  .minirow { display: flex; gap: 14px; margin-top: 8px; }
+  .minirow:empty, .minirow[hidden] { display: none; }
+  .link {
+    background: none; border: 0; padding: 0; cursor: pointer; font: inherit;
+    font-size: 11px; color: var(--acc); text-decoration: none;
+  }
+  .link:hover { text-decoration: underline; }
+  .link[hidden] { display: none; }
+  .note-ok { font-size: 10.5px; color: #46d39a; margin: 7px 0 0; }
+  .note-ok[hidden] { display: none; }
   .chip {
     background: var(--card); border: 1px solid var(--line); border-radius: 9px;
     padding: 7px 4px; cursor: pointer; font: inherit; font-size: 11.5px;
@@ -231,6 +276,19 @@
         <button class="chip" id="p-night">Night</button>
         <button class="chip" id="p-strict">Strict</button>
       </div>
+
+      <div class="slots" id="slots"></div>
+
+      <div class="saverow" id="saverow" hidden>
+        <input type="text" id="slotname" placeholder="Name these settings" maxlength="18" spellcheck="false">
+        <button id="save">Save</button>
+      </div>
+
+      <div class="minirow" id="minirow">
+        <button class="link" id="setdefault" hidden>Set as my default</button>
+        <button class="link" id="undo" hidden>Undo last change</button>
+      </div>
+      <p class="note-ok" id="savednote" hidden></p>
     </section>
 
     <section>
@@ -329,7 +387,9 @@
         </div>
         <p class="hint">Switch to Video filter if bright areas go undimmed — it applies the curve to the video itself instead of compositing a layer over it.</p>
 
-        <button class="btn" id="reset" style="margin-top:11px">Reset all to defaults</button>
+        <button class="btn" id="reset" style="margin-top:11px">Reset to my default</button>
+        <button class="btn" id="factory" style="margin-top:7px">Restore factory defaults</button>
+        <p class="hint">Reset returns to your own default if you have set one, otherwise to the factory values. Either way it is undoable.</p>
       </div>
     </details>
 
