@@ -3,112 +3,322 @@
 <head>
 <meta charset="utf-8">
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: dark;
+    --bg:      #0e0f12;
+    --card:    #16181d;
+    --card-2:  #1b1e24;
+    --line:    #262930;
+    --line-2:  #32363f;
+    --txt:     #e4e6ec;
+    --txt-2:   #969bab;
+    --txt-3:   #6a6f7d;
+    --acc:     #7f9cff;
+    --acc-2:   #5e78e8;
+    --hot-a:   #d9822b;
+    --hot-b:   #ffc56b;
+    --cool-a:  #2f8f7a;
+    --cool-b:  #5ee0c0;
+    --r:       10px;
+  }
+  * { box-sizing: border-box; }
   body {
-    width: 318px; margin: 0; padding: 14px 15px 16px;
-    background: #15161a; color: #d8dae0;
+    width: 340px; margin: 0; padding: 0 0 14px;
+    background: var(--bg); color: var(--txt);
     font: 13px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
-  h1 { font-size: 13px; margin: 0 0 2px; letter-spacing: .02em; }
-  .sub { font-size: 11px; color: #777b86; margin: 0 0 12px; }
 
-  .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 12px 0 3px; }
-  label { font-size: 12px; color: #b4b8c2; }
-  .val { font-size: 11px; color: #6f7480; font-variant-numeric: tabular-nums; }
-  .hint { font-size: 10.5px; color: #626774; margin: 1px 0 0; }
-
-  input[type=range] { width: 100%; margin: 0; accent-color: #6b8afd; height: 18px; }
-  .switch { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-  input[type=checkbox] { accent-color: #6b8afd; width: 15px; height: 15px; }
-
-  .bar { height: 6px; border-radius: 3px; background: #26282f; overflow: hidden; margin-top: 4px; }
-  .bar > i { display: block; height: 100%; width: 0%; transition: width .1s linear; }
-  .lumfill { background: linear-gradient(90deg,#6a4a3a,#ffb46b); }
-  .showfill { background: linear-gradient(90deg,#3b4a7a,#8fa6ff); }
-  .tiny { font-size: 10.5px; color: #6f7480; display: flex; justify-content: space-between; }
-
-  .presets { display: flex; gap: 6px; margin: 11px 0 2px; }
-  .presets button { flex: 1; }
-  button {
-    padding: 6px 4px; border-radius: 6px; cursor: pointer;
-    background: #22242b; color: #aeb2bc; border: 1px solid #31343d; font-size: 11.5px;
+  /* ---------- header ---------- */
+  .hdr {
+    display: flex; align-items: center; gap: 10px;
+    padding: 12px 15px 11px;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, #171a20, var(--bg));
   }
-  button:hover { background: #2d303a; color: #d8dae0; }
-  button.sel { background: #2f3f72; border-color: #4a63ad; color: #dbe3ff; }
-  #reset { width: 100%; margin-top: 11px; }
+  .hdr svg { flex: none; }
+  .hdr h1 { font-size: 13.5px; font-weight: 600; margin: 0; letter-spacing: .01em; }
+  .hdr p  { font-size: 11px; color: var(--txt-3); margin: 1px 0 0; }
+  .hdr .sp { flex: 1; }
 
-  hr { border: 0; border-top: 1px solid #262830; margin: 14px 0 2px; }
-  .note { font-size: 10.5px; color: #686d79; margin-top: 10px; }
-  .off { opacity: .4; pointer-events: none; }
+  .wrap { padding: 0 15px; }
+  section { margin-top: 10px; }
+  .sect-t {
+    font-size: 10px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase;
+    color: var(--txt-3); margin: 0 0 7px 2px;
+  }
+
+  /* ---------- toggle switch ---------- */
+  .tgl { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+  .tgl input { position: absolute; opacity: 0; width: 0; height: 0; }
+  .track {
+    flex: none; position: relative; width: 38px; height: 22px; border-radius: 99px;
+    background: #2b2f38; border: 1px solid var(--line-2);
+    transition: background .2s, border-color .2s;
+  }
+  .knob {
+    position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #9ba1b0; box-shadow: 0 1px 3px rgba(0,0,0,.5);
+    transition: transform .22s cubic-bezier(.4,0,.2,1), background .2s;
+  }
+  .tgl input:checked + .track { background: var(--acc-2); border-color: var(--acc); }
+  .tgl input:checked + .track .knob { transform: translateX(16px); background: #fff; }
+  .tgl input:focus-visible + .track { box-shadow: 0 0 0 3px rgba(127,156,255,.3); }
+  .tgl-l { font-size: 12.5px; }
+  kbd {
+    font: 10.5px ui-monospace, monospace; color: var(--txt-3);
+    border: 1px solid var(--line-2); border-radius: 4px; padding: 1px 4px; margin-left: 4px;
+  }
+
+  /* ---------- segmented control ---------- */
+  .seg {
+    position: relative; display: grid; grid-template-columns: 1fr 1fr;
+    background: var(--card); border: 1px solid var(--line); border-radius: 11px; padding: 3px;
+  }
+  .seg::before {
+    content: ''; position: absolute; top: 3px; left: 3px;
+    width: calc(50% - 3px); height: calc(100% - 6px); border-radius: 8px;
+    background: linear-gradient(180deg, #6d85ec, #5469cc);
+    box-shadow: 0 2px 6px rgba(0,0,0,.4);
+    transition: transform .24s cubic-bezier(.4,0,.2,1);
+  }
+  .seg[data-sel="1"]::before { transform: translateX(100%); }
+  .seg button {
+    position: relative; z-index: 1; background: none; border: 0; cursor: pointer;
+    padding: 7px 4px; border-radius: 8px; font: inherit; font-size: 12px; font-weight: 500;
+    color: var(--txt-2); transition: color .18s;
+  }
+  .seg button.sel { color: #fff; }
+  .seg button:not(.sel):hover { color: var(--txt); }
+
+  /* ---------- preset chips ---------- */
+  .chips { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+  .chip {
+    background: var(--card); border: 1px solid var(--line); border-radius: 9px;
+    padding: 7px 4px; cursor: pointer; font: inherit; font-size: 11.5px;
+    color: var(--txt-2); transition: all .16s;
+  }
+  .chip:hover { background: var(--card-2); color: var(--txt); border-color: var(--line-2); }
+  .chip.sel {
+    background: rgba(127,156,255,.14); border-color: rgba(127,156,255,.55); color: #cfd9ff;
+  }
+
+  /* ---------- meters ---------- */
+  .panel {
+    background: var(--card); border: 1px solid var(--line);
+    border-radius: var(--r); padding: 11px 13px;
+  }
+  .mrow { display: flex; justify-content: space-between; font-size: 11px; color: var(--txt-2); }
+  .mrow b { font-weight: 600; color: var(--txt); font-variant-numeric: tabular-nums; }
+  .meter {
+    position: relative; height: 7px; border-radius: 99px; margin: 5px 0 9px;
+    background: #23262d; overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,.45);
+  }
+  .meter:last-of-type { margin-bottom: 8px; }
+  .mfill {
+    height: 100%; width: 0; border-radius: 99px;
+    transition: width .12s linear;
+  }
+  #lumbar  { background: linear-gradient(90deg, var(--hot-a), var(--hot-b)); }
+  #showbar { background: linear-gradient(90deg, var(--cool-a), var(--cool-b)); }
+  #ceilmark {
+    position: absolute; top: -2px; bottom: -2px; width: 2px; left: 0;
+    background: #fff; border-radius: 2px; opacity: 0;
+    box-shadow: 0 0 4px rgba(0,0,0,.8); transition: left .12s linear, opacity .2s;
+  }
+  .foot { font-size: 10.5px; color: var(--txt-3); line-height: 1.4; }
+  .dot { display: inline-block; width: 6px; height: 6px; border-radius: 50%; margin-right: 5px;
+         background: var(--txt-3); vertical-align: 1px; }
+  .dot.ok   { background: #46d39a; box-shadow: 0 0 6px rgba(70,211,154,.7); }
+  .dot.warn { background: #e8a33d; }
+  .dot.bad  { background: #e2564d; }
+
+  /* ---------- sliders ---------- */
+  .ctl { margin-top: 11px; }
+  .ctl:first-child { margin-top: 0; }
+  .lbl { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .lbl label { font-size: 12.5px; color: var(--txt); }
+  .lbl .v {
+    font-size: 11px; color: var(--acc); font-variant-numeric: tabular-nums; font-weight: 500;
+  }
+  .hint { font-size: 10.5px; color: var(--txt-3); margin: 3px 0 0; line-height: 1.35; }
+
+  input[type=range] {
+    -webkit-appearance: none; appearance: none;
+    width: 100%; margin: 8px 0 0; background: transparent; height: 16px; cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 6px; border-radius: 99px;
+    background: linear-gradient(90deg, var(--acc) var(--p,0%), #272a32 var(--p,0%));
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 15px; height: 15px; margin-top: -4.5px; border-radius: 50%;
+    background: #fff; border: 2px solid var(--acc-2);
+    box-shadow: 0 1px 4px rgba(0,0,0,.55); transition: transform .14s;
+  }
+  input[type=range]:hover::-webkit-slider-thumb { transform: scale(1.14); }
+  input[type=range]:active::-webkit-slider-thumb { transform: scale(1.14); background: #eef2ff; }
+  input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(127,156,255,.3); }
+
+  /* ---------- disclosure ---------- */
+  details { border-top: 1px solid var(--line); margin-top: 12px; padding-top: 9px; }
+  summary {
+    list-style: none; cursor: pointer; font-size: 11.5px; color: var(--txt-2);
+    display: flex; align-items: center; gap: 6px; user-select: none;
+  }
+  summary::-webkit-details-marker { display: none; }
+  summary::before {
+    content: ''; width: 5px; height: 5px; border-right: 1.5px solid currentColor;
+    border-bottom: 1.5px solid currentColor; transform: rotate(-45deg); margin-left: 2px;
+    transition: transform .2s;
+  }
+  details[open] summary::before { transform: rotate(45deg); }
+  summary:hover { color: var(--txt); }
+  .dbody { padding-top: 12px; }
+
+  .btn {
+    width: 100%; padding: 8px; border-radius: 9px; cursor: pointer; font: inherit; font-size: 11.5px;
+    background: var(--card); color: var(--txt-2); border: 1px solid var(--line); transition: all .16s;
+  }
+  .btn:hover { background: var(--card-2); color: var(--txt); border-color: var(--line-2); }
+
+  /* ---------- state-driven visibility ---------- */
+  body[data-mode="clip"] .only-dim  { display: none; }
+  body[data-mode="dim"]  .only-clip { display: none; }
+  #panel.off { opacity: .35; pointer-events: none; filter: saturate(.4); }
+  #panel { transition: opacity .2s, filter .2s; }
 </style>
 </head>
-<body>
-  <h1>Media Layer</h1>
-  <p class="sub">Brightness limiter for YouTube</p>
+<body data-mode="clip">
 
-  <label class="switch"><input type="checkbox" id="enabled"><span>Enabled <span class="val">(Alt+Shift+D)</span></span></label>
-
-  <div id="panel">
-    <div class="presets" style="margin-top:12px">
-      <button id="m-clip">Selective</button>
-      <button id="m-dim">Whole frame</button>
+  <div class="hdr">
+    <svg width="28" height="28" viewBox="0 0 100 100" aria-hidden="true">
+      <defs>
+        <linearGradient id="w" x1="0" y1="0.33" x2="0" y2="1">
+          <stop offset="0" stop-color="#ffd882"/><stop offset="1" stop-color="#f39426"/>
+        </linearGradient>
+        <clipPath id="below"><rect x="0" y="33" width="100" height="67"/></clipPath>
+        <clipPath id="above"><rect x="0" y="0" width="100" height="25.5"/></clipPath>
+      </defs>
+      <circle cx="50" cy="57" r="42" fill="#ffce80" opacity=".33" clip-path="url(#above)"/>
+      <circle cx="50" cy="57" r="42" fill="url(#w)" clip-path="url(#below)"/>
+    </svg>
+    <div>
+      <h1>Media Layer</h1>
+      <p>Brightness limiter for YouTube</p>
     </div>
-    <p class="hint">Selective caps only the bright pixels and leaves dark areas alone.</p>
+    <div class="sp"></div>
+    <label class="tgl" title="Enable / disable">
+      <input type="checkbox" id="enabled"><span class="track"><span class="knob"></span></span>
+    </label>
+  </div>
 
-    <div class="presets">
-      <button id="p-gentle">Gentle</button>
-      <button id="p-night">Night</button>
-      <button id="p-strict">Strict</button>
-    </div>
+  <div class="wrap" id="panel">
 
-    <div class="tiny" style="margin-top:10px"><span>Video is actually</span><span id="lumv">—</span></div>
-    <div class="bar"><i class="lumfill" id="lumbar"></i></div>
-    <div class="tiny" style="margin-top:7px"><span>You are seeing</span><span id="showv">—</span></div>
-    <div class="bar"><i class="showfill" id="showbar"></i></div>
-    <div class="tiny" id="areav" style="margin-top:7px"></div>
-    <div class="tiny" id="status" style="margin-top:4px"></div>
+    <section>
+      <p class="sect-t">What gets dimmed</p>
+      <div class="seg" id="seg" data-sel="0">
+        <button id="m-clip">Selective</button>
+        <button id="m-dim">Whole frame</button>
+      </div>
+    </section>
 
-    <hr>
+    <section>
+      <div class="chips">
+        <button class="chip" id="p-gentle">Gentle</button>
+        <button class="chip" id="p-night">Night</button>
+        <button class="chip" id="p-strict">Strict</button>
+      </div>
+    </section>
 
-    <div class="row"><label for="hardCeiling">Brightness ceiling</label><span class="val" id="hardCeilingv"></span></div>
-    <input type="range" id="hardCeiling" min="8" max="100" step="1">
-    <p class="hint">Hard cap. Nothing on screen may exceed this. Dark areas are untouched.</p>
+    <section>
+      <div class="panel">
+        <div class="mrow"><span>Video is actually</span><b id="lumv">—</b></div>
+        <div class="meter"><div class="mfill" id="lumbar"></div><div id="ceilmark"></div></div>
+        <div class="mrow"><span>You are seeing</span><b id="showv">—</b></div>
+        <div class="meter"><div class="mfill" id="showbar"></div></div>
+        <p class="foot" id="areav"></p>
+        <p class="foot" id="status" style="margin:4px 0 0"><span class="dot"></span></p>
+      </div>
+    </section>
 
-    <div class="row"><label for="clipStrength">Clip hardness</label><span class="val" id="clipStrengthv"></span></div>
-    <input type="range" id="clipStrength" min="20" max="100" step="1">
-    <p class="hint">Softer keeps more detail in bright areas but lets more light through.</p>
+    <section class="only-clip">
+      <p class="sect-t">Selective limiting</p>
 
-    <div class="row"><label for="areaComp">Large bright areas</label><span class="val" id="areaCompv"></span></div>
-    <input type="range" id="areaComp" min="0" max="90" step="1">
-    <p class="hint">Lowers the ceiling further as more of the frame goes bright. A full white screen floods the eye even when its peak is capped.</p>
+      <div class="ctl">
+        <div class="lbl"><label for="hardCeiling">Brightness ceiling</label><span class="v" id="hardCeilingv"></span></div>
+        <input type="range" id="hardCeiling" min="8" max="100" step="1">
+      </div>
 
-    <hr>
-    <p class="hint" style="margin-bottom:0">Below applies to Whole frame mode only.</p>
+      <div class="ctl">
+        <div class="lbl"><label for="clipStrength">Clip hardness</label><span class="v" id="clipStrengthv"></span></div>
+        <input type="range" id="clipStrength" min="20" max="100" step="1">
+        <p class="hint">Softer keeps bright-area detail, but passes more light.</p>
+      </div>
 
-    <div class="row"><label for="ceiling">Average scene target</label><span class="val" id="ceilingv"></span></div>
-    <input type="range" id="ceiling" min="10" max="95" step="1">
+    </section>
 
-    <div class="row"><label for="maxDim">Maximum extra dimming</label><span class="val" id="maxDimv"></span></div>
-    <input type="range" id="maxDim" min="0" max="90" step="1">
+    <section class="only-dim">
+      <p class="sect-t">Whole frame limiting</p>
 
-    <div class="row"><label for="baseDim">Always-on dim</label><span class="val" id="baseDimv"></span></div>
-    <input type="range" id="baseDim" min="0" max="60" step="1">
+      <div class="ctl">
+        <div class="lbl"><label for="ceiling">Average scene target</label><span class="v" id="ceilingv"></span></div>
+        <input type="range" id="ceiling" min="10" max="95" step="1">
+      </div>
 
-    <div class="row"><label for="releaseMs">Recovery speed</label><span class="val" id="releaseMsv"></span></div>
-    <input type="range" id="releaseMs" min="300" max="4000" step="50">
+      <div class="ctl">
+        <div class="lbl"><label for="maxDim">Maximum dimming</label><span class="v" id="maxDimv"></span></div>
+        <input type="range" id="maxDim" min="0" max="90" step="1">
+      </div>
+    </section>
 
-    <hr>
-    <div class="row" style="margin-bottom:0">
-      <label class="switch"><input type="checkbox" id="flashGuard"><span>Flash guard</span></label>
-      <span class="val" id="flashDeltav"></span>
-    </div>
-    <input type="range" id="flashDelta" min="4" max="40" step="1">
+    <details>
+      <summary>Fine tuning</summary>
+      <div class="dbody">
 
-    <label class="switch" style="margin-top:13px"><input type="checkbox" id="testMode"><span>Test mode (red wash)</span></label>
-    <p class="hint">Turns the layer bright red. If you see red over the video, it is attached.</p>
+      <div class="ctl only-clip">
+        <div class="lbl"><label for="areaComp">Large bright areas</label><span class="v" id="areaCompv"></span></div>
+        <input type="range" id="areaComp" min="0" max="90" step="1">
+        <p class="hint">Tightens the ceiling as more of the frame goes bright.</p>
+      </div>
 
-    <button id="reset">Reset to defaults</button>
-    <p class="note">Dims the picture only — subtitles and player controls stay at full brightness.</p>
+      <div class="ctl">
+        <div class="lbl"><label for="baseDim">Always-on dim</label><span class="v" id="baseDimv"></span></div>
+        <input type="range" id="baseDim" min="0" max="60" step="1">
+      </div>
+
+      <div class="ctl">
+        <div class="lbl"><label for="releaseMs">Recovery speed</label><span class="v" id="releaseMsv"></span></div>
+        <input type="range" id="releaseMs" min="300" max="4000" step="50">
+      </div>
+
+      <div class="ctl">
+        <label class="tgl">
+          <input type="checkbox" id="flashGuard">
+          <span class="track"><span class="knob"></span></span>
+          <span class="tgl-l">Flash guard</span>
+        </label>
+        <div class="lbl" style="margin-top:9px"><label for="flashDelta">Sensitivity</label><span class="v" id="flashDeltav"></span></div>
+        <input type="range" id="flashDelta" min="4" max="40" step="1">
+      </div>
+      </div>
+    </details>
+
+    <details>
+      <summary>Diagnostics</summary>
+      <div class="dbody">
+        <label class="tgl">
+          <input type="checkbox" id="testMode">
+          <span class="track"><span class="knob"></span></span>
+          <span class="tgl-l">Test mode</span>
+        </label>
+        <p class="hint">Washes the layer bright red. If you see red over the video, it is attached.</p>
+        <button class="btn" id="reset" style="margin-top:11px">Reset all to defaults</button>
+      </div>
+    </details>
+
   </div>
 
   <script src="popup.js"></script>
