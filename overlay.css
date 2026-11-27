@@ -14,6 +14,24 @@
   -webkit-backdrop-filter: brightness(var(--ml-page-level, 1));
 }
 
+/* Dark mode. Inverting the backdrop turns a white page dark AND dark text
+   light, so contrast is kept rather than spent - the one way to take a light
+   page genuinely dark and still read it. Photos are pre-inverted below so the
+   veil's inversion cancels out and they look normal. hue-rotate restores hues
+   that plain inversion would flip. */
+.ml-page-veil.ml-dark {
+  backdrop-filter: invert(1) hue-rotate(180deg);
+  -webkit-backdrop-filter: invert(1) hue-rotate(180deg);
+}
+html.ml-darkpage img,
+html.ml-darkpage video,
+html.ml-darkpage canvas,
+html.ml-darkpage picture,
+html.ml-darkpage iframe,
+html.ml-darkpage [style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg);
+}
+
 /* Whites-only on a page of text collapses contrast: the background drops
    while the text, having no white content, correctly does not move. Good for
    pages that are mostly pictures, bad for anything you read. */

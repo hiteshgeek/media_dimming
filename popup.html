@@ -137,6 +137,31 @@
   .timerow input:focus { outline: none; border-color: var(--acc); }
   .timerow[hidden] { display: none; }
 
+  /* visited-site list */
+  .sites { margin-top: 9px; max-height: 176px; overflow-y: auto; border: 1px solid var(--line);
+           border-radius: 9px; background: var(--card); }
+  .sites:empty { display: none; }
+  .site {
+    display: flex; align-items: center; gap: 9px; padding: 7px 10px;
+    border-bottom: 1px solid var(--line); font-size: 11.5px; color: var(--txt-2);
+  }
+  .site:last-child { border-bottom: 0; }
+  .site.here { background: rgba(127,156,255,.10); color: var(--txt); }
+  .site .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .site .tag { font-size: 9.5px; letter-spacing: .05em; text-transform: uppercase;
+               color: var(--acc); flex: none; }
+  .site .tag.dk { color: #46d39a; }
+  .sites::-webkit-scrollbar { width: 8px; }
+  .sites::-webkit-scrollbar-thumb { background: #2d313a; border-radius: 8px; }
+
+  /* compact switch for list rows */
+  .mini { flex: none; position: relative; width: 30px; height: 17px; border-radius: 99px;
+          background: #2b2f38; border: 1px solid var(--line-2); cursor: pointer; }
+  .mini i { position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%;
+            background: #9ba1b0; transition: transform .2s, background .2s; }
+  .mini.on { background: var(--acc-2); border-color: var(--acc); }
+  .mini.on i { transform: translateX(13px); background: #fff; }
+
   .minirow { display: flex; gap: 14px; margin-top: 8px; }
   .minirow:empty, .minirow[hidden] { display: none; }
   .link {
@@ -362,10 +387,12 @@
         </label>
         <p class="hint">Same white-only rule across the whole page, applied behind a fixed overlay so layouts and sticky headers are untouched.</p>
 
-        <div class="seg" id="seg3" data-sel="0" style="margin-top:11px">
-          <button id="pm-uniform">Dim evenly</button>
-          <button id="pm-white">Whites only</button>
+        <div class="chips" style="margin-top:11px">
+          <button class="chip" id="pm-dark">Dark mode</button>
+          <button class="chip" id="pm-uniform">Dim evenly</button>
+          <button class="chip" id="pm-white">Whites only</button>
         </div>
+        <p class="hint" id="pmhint"></p>
 
         <div class="ctl" id="pagerow-u">
           <div class="lbl"><label for="pageLevel">Page brightness</label><span class="v" id="pageLevelv"></span></div>
@@ -380,11 +407,16 @@
           <p class="hint">Keeps colour vivid, but on a page of text the background drops while the text does not, which collapses contrast. Best for picture-heavy sites.</p>
         </div>
 
-        <label class="tgl" id="siterow" style="margin-top:12px" hidden>
-          <input type="checkbox" id="siteOn">
+        <label class="tgl" style="margin-top:12px">
+          <input type="checkbox" id="skipDark">
           <span class="track"><span class="knob"></span></span>
-          <span class="tgl-l">Dim <b id="sitename" style="font-weight:600"></b></span>
+          <span class="tgl-l">Skip sites already dark</span>
         </label>
+        <p class="hint">Reads the background actually in effect, so a site with dark mode switched on is left alone.</p>
+
+        <p class="sect-t" style="margin-top:13px">Sites you have visited</p>
+        <div class="sites" id="sites"></div>
+        <p class="hint" id="sitesnote">The page you are on is listed first.</p>
       </div>
     </details>
 

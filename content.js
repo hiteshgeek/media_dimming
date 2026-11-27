@@ -32,7 +32,8 @@
   const DEFAULTS = {
     enabled: true,
     dimPages: true,     // dim ordinary sites, not just YouTube
-    pageMode: 'uniform',// 'uniform' = dim the page evenly | 'white' = whites only
+    pageMode: 'dark',   // 'dark' = invert to real dark mode | 'uniform' | 'white'
+    skipDark: true,     // leave pages that are already dark alone
     pageLevel: 0.72,    // uniform brightness. Below ~0.65 body text stops being legible
     pageCeiling: 0.45,  // ceiling used by whites-only page mode
     siteOff: [],        // hostnames to leave alone
@@ -92,6 +93,31 @@
   const isYT = /(^|\.)(youtube|youtube-nocookie)\.com$/i.test(location.hostname);
   const siteAllowed = () =>
     !(cfg.siteOff || []).some(h => h === location.hostname);
+
+  // Is this page already dark? Nothing to dim if so, and dimming it again
+  // only makes text worse. Read the background actually in effect rather
+  // than trusting prefers-color-scheme, which says what the user asked for,
+  // not what the site did about it.
+  function bgLuma() {
+    for (const el of [document.body, document.documentElement]) {
+      if (!el) continue;
+      const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/
+        .exec(getComputedStyle(el).backgroundColor || '');
+      if (!m) continue;
+      if (m[4] !== undefined && +m[4] < 0.5) continue;   // transparent, keep looking
+      return (0.2126 * +m[1] + 0.7152 * +m[2] + 0.0722 * +m[3]) / 255;
+    }
+    return 1;   // nothing opaque found, assume the canvas white
+  }
+
+  let darkCache = { at: -1e9, dark: false };
+  function pageIsDark() {
+    const now = Date.now();
+    if (now - darkCache.at < 1500) return darkCache.dark;
+    const dark = bgLuma() < 0.25;
+    darkCache = { at: now, dark: dark };
+    return dark;
+  }
 
   // Whether the limiter should be doing anything at this moment. The master
   // switch and the schedule both have to agree.
@@ -266,22 +292,30 @@
   let veil = null;
 
   function ensureVeil(on) {
-    const want = on && !isYT && cfg.dimPages && siteAllowed();
+    const want = on && !isYT && cfg.dimPages && siteAllowed()
+                 && !(cfg.skipDark && pageIsDark());
     if (!want) {
       if (veil) { veil.remove(); veil = null; }
+      root.classList.remove('ml-darkpage');
       return;
     }
     const whites = cfg.pageMode === 'white';
+    const darkMode = cfg.pageMode === 'dark';
+    root.classList.toggle('ml-darkpage', darkMode);
     if (whites) {
       if (!buildFilter('ml-page')) return;    // nothing to reference yet
       setTable('ml-page', clamp(cfg.pageCeiling, 0.05, 1), 1);
     } else {
       root.style.setProperty('--ml-page-level', clamp(cfg.pageLevel, 0.2, 1).toFixed(3));
     }
-    if (veil && veil.isConnected) { veil.classList.toggle('ml-white', whites); return; }
+    if (veil && veil.isConnected) {
+      veil.classList.toggle('ml-white', whites);
+      veil.classList.toggle('ml-dark', darkMode);
+      return;
+    }
     if (!document.body) return;
     veil = document.createElement('div');
-    veil.className = 'ml-page-veil' + (whites ? ' ml-white' : '');
+    veil.className = 'ml-page-veil' + (whites ? ' ml-white' : darkMode ? ' ml-dark' : '');
     veil.setAttribute('aria-hidden', 'true');
     document.body.appendChild(veil);
   }
@@ -491,6 +525,17 @@
     if (selective) setCeiling(state.effCeiling);
   }
 
+  // Remember this host so the popup can offer it in a list later.
+  if (location.hostname && chrome.storage && chrome.storage.local) {
+    try {
+      chrome.storage.local.get({ seenSites: [] }, (r) => {
+        const h = location.hostname;
+        const list = [h].concat((r.seenSites || []).filter(x => x !== h)).slice(0, 120);
+        chrome.storage.local.set({ seenSites: list });
+      });
+    } catch (e) { /* storage.local unavailable */ }
+  }
+
   // Load settings last: the callback touches everything above, and a
   // synchronous implementation would otherwise run before the consts exist.
   chrome.storage.sync.get(DEFAULTS, (v) => { cfg = { ...DEFAULTS, ...v }; applyStatic(); });
@@ -511,6 +556,8 @@
         active: isActive(),
         site: location.hostname,
         siteDimmed: !isYT && cfg.dimPages && siteAllowed(),
+        pageDark: !isYT && pageIsDark(),
+        veiled: !!veil,
         isYouTube: isYT,
         hasVideo: state.hasVideo,
         attached: cfg.clipEngine === 'filter' ? !!filters['ml-clip'] : state.attached,

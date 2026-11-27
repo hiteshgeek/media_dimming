@@ -1,7 +1,7 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   schedule: 'night', startMin: 22 * 60, endMin: 6 * 60,
-  dimPages: true, pageMode: 'uniform', pageLevel: 0.72, pageCeiling: 0.45, siteOff: [],
+  dimPages: true, pageMode: 'dark', skipDark: true, pageLevel: 0.72, pageCeiling: 0.45, siteOff: [],
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
   whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
@@ -15,6 +15,7 @@ const DEFAULTS = {
 const NOT_TUNABLE = ['enabled', 'testMode', 'siteOff', 'schedule', 'startMin', 'endMin'];
 const TUNABLE = Object.keys(DEFAULTS).filter(k => !NOT_TUNABLE.includes(k));
 const META = { slots: [], undoCfg: null };
+const LOCAL = { seenSites: [] };
 const MAX_SLOTS = 5;
 
 const PRESETS = {
@@ -80,11 +81,13 @@ function fill(el) {
 }
 
 // ---------- state ----------
-let CFG = { ...DEFAULTS }, MET = { ...META };
+let CFG = { ...DEFAULTS }, MET = { ...META }, LOC = { ...LOCAL };
+let HERE = null, HERE_DARK = false;
 
 async function load() {
   CFG = await chrome.storage.sync.get(DEFAULTS);
   MET = await chrome.storage.sync.get(META);
+  LOC = await chrome.storage.local.get(LOCAL);
   render();
 }
 
@@ -110,15 +113,18 @@ function render() {
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
   $('dimPages').checked = cfg.dimPages;
-  const whites = cfg.pageMode === 'white';
-  $('pm-uniform').classList.toggle('sel', !whites);
-  $('pm-white').classList.toggle('sel', whites);
-  $('seg3').dataset.sel = whites ? '1' : '0';
-  $('pagerow-u').hidden = whites;
-  $('pagerow-w').hidden = !whites;
+  $('skipDark').checked = cfg.skipDark;
+  const pm = cfg.pageMode;
+  for (const k of ['dark', 'uniform', 'white']) $('pm-' + k).classList.toggle('sel', pm === k);
+  $('pmhint').textContent =
+    pm === 'dark' ? 'Turns the page dark and the text light, so contrast is kept rather than spent. Photos are left looking normal.'
+    : pm === 'uniform' ? 'Dims text and background together. Gentler, but it can only go so dark before reading gets hard.'
+    : 'Dims white only, leaving colour vivid. On a page of text this collapses contrast, so it suits picture-heavy sites.';
+  $('pagerow-u').hidden = pm !== 'uniform';
+  $('pagerow-w').hidden = pm !== 'white';
   $('pageLevel').disabled = !cfg.dimPages;
   $('pageCeiling').disabled = !cfg.dimPages;
-  $('pagewarn').hidden = whites || cfg.pageLevel >= 0.65;
+  $('pagewarn').hidden = pm !== 'uniform' || cfg.pageLevel >= 0.65;
   $('dimThumbs').checked = cfg.dimThumbs;
   $('thumbMatch').checked = cfg.thumbMatch;
   $('thumbMatch').disabled = !cfg.dimThumbs;
@@ -166,6 +172,7 @@ function render() {
     : 'Outside the window, so it is off until ' + pretty(w[0]) + '.';
 
   renderSlots();
+  renderSites();
 
   const hitSlot = MET.slots.findIndex(s => sameCfg(cfg, s.cfg));
   const isDefault = sameCfg(cfg, DEFAULTS);
@@ -243,20 +250,18 @@ $('dimThumbs').addEventListener('change', async (e) => {
   await chrome.storage.sync.set({ dimThumbs: e.target.checked });
   render();
 });
-$('pm-uniform').addEventListener('click', () => setKey('pageMode', 'uniform'));
-$('pm-white').addEventListener('click', () => setKey('pageMode', 'white'));
+for (const k of ['dark', 'uniform', 'white']) {
+  $('pm-' + k).addEventListener('click', () => setKey('pageMode', k));
+}
+$('skipDark').addEventListener('change', async (e) => {
+  CFG.skipDark = e.target.checked;
+  await chrome.storage.sync.set({ skipDark: e.target.checked });
+  render();
+});
 $('dimPages').addEventListener('change', async (e) => {
   CFG.dimPages = e.target.checked;
   await chrome.storage.sync.set({ dimPages: e.target.checked });
   render();
-});
-$('siteOn').addEventListener('change', async (e) => {
-  const host = $('siteOn').dataset.host;
-  if (!host) return;
-  const cur = await chrome.storage.sync.get({ siteOff: [] });
-  const off = new Set(cur.siteOff);
-  if (e.target.checked) off.delete(host); else off.add(host);
-  await chrome.storage.sync.set({ siteOff: [...off] });
 });
 $('thumbMatch').addEventListener('change', async (e) => {
   CFG.thumbMatch = e.target.checked;
@@ -316,6 +321,53 @@ $('undo').addEventListener('click', async () => {
 
 $('reset').addEventListener('click', () => applyWithUndo(snap(DEFAULTS)));
 
+// Sites seen so far, each with its own switch. The page in front of you is
+// the one you are most likely here to change, so it goes first and is marked.
+function renderSites() {
+  const box = $('sites');
+  box.textContent = '';
+  const off = new Set(CFG.siteOff || []);
+  const seen = (LOC.seenSites || [])
+    .filter(h => h && !/(^|\.)youtube(-nocookie)?\.com$/i.test(h));
+  const list = HERE ? [HERE].concat(seen.filter(h => h !== HERE)) : seen;
+
+  if (!list.length) { $('sitesnote').textContent = 'Nothing visited yet.'; return; }
+  $('sitesnote').textContent = 'The page you are on is listed first.';
+
+  for (const host of list) {
+    const row = document.createElement('div');
+    row.className = 'site' + (host === HERE ? ' here' : '');
+
+    const nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = host;
+    nm.title = host;
+    row.appendChild(nm);
+
+    if (host === HERE) {
+      const tag = document.createElement('span');
+      tag.className = 'tag' + (HERE_DARK ? ' dk' : '');
+      tag.textContent = HERE_DARK ? 'already dark' : 'here';
+      row.appendChild(tag);
+    }
+
+    const sw = document.createElement('span');
+    sw.className = 'mini' + (off.has(host) ? '' : ' on');
+    sw.appendChild(document.createElement('i'));
+    sw.title = off.has(host) ? 'Not dimmed' : 'Dimmed';
+    sw.addEventListener('click', async () => {
+      const cur = await chrome.storage.sync.get({ siteOff: [] });
+      const s = new Set(cur.siteOff);
+      if (s.has(host)) s.delete(host); else s.add(host);
+      await chrome.storage.sync.set({ siteOff: [...s] });
+      CFG.siteOff = [...s];
+      renderSites();
+    });
+    row.appendChild(sw);
+    box.appendChild(row);
+  }
+}
+
 // ---------- live meter ----------
 function setStatus(cls, text) {
   $('status').innerHTML = '<span class="dot ' + cls + '"></span>' + text;
@@ -347,11 +399,10 @@ async function poll() {
         ? pct(r.brightArea) + '% over ceiling · scene level ' + pct(r.ambient) + '% · capped at ' + pct(r.ceiling) + '%'
         : 'Whole frame dimmed by ' + pct(r.dim) + '%';
 
-    if (r.site) {
-      $('siterow').hidden = !!r.isYouTube;
-      $('siteOn').dataset.host = r.site;
-      $('siteOn').checked = !!r.siteDimmed;
-      $('sitename').textContent = r.site;
+    if (r.site && (r.site !== HERE || !!r.pageDark !== HERE_DARK)) {
+      HERE = r.isYouTube ? null : r.site;
+      HERE_DARK = !!r.pageDark;
+      renderSites();
     }
     if (r.active === false) setStatus('warn', 'Outside the schedule — not dimming');
     else if (!r.hasVideo) setStatus('', 'No video on this tab');
