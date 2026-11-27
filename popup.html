@@ -400,10 +400,10 @@
 
         <p class="sect-t" style="margin-top:13px">Clip engine</p>
         <div class="seg" id="seg2" data-sel="0">
-          <button id="e-blend">Blend layer</button>
-          <button id="e-filter">Video filter</button>
+          <button id="e-filter">Colour safe</button>
+          <button id="e-blend">Fast</button>
         </div>
-        <p class="hint">Switch to Video filter if bright areas go undimmed — it applies the curve to the video itself instead of compositing a layer over it.</p>
+        <p class="hint">Colour safe scales all three channels together, so bright colours keep their hue. Fast clips each channel on its own, which is cheaper but turns bright colours grey.</p>
 
         <button class="btn" id="reset" style="margin-top:11px">Reset to defaults</button>
         <p class="hint">Undoable. To keep settings of your own, save them as a preset above.</p>

@@ -3,7 +3,7 @@
 const FACTORY = {
   mode: 'clip',
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55,
-  maxContrast: 3, minCeiling: 0.10, clipEngine: 'blend', flashCeil: 0.45,
+  maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter', flashCeil: 0.45,
   dimThumbs: true, thumbCeiling: 0.45, thumbStrength: 1.0,
   ceiling: 0.30, maxDim: 0.82, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
@@ -13,7 +13,7 @@ const FACTORY = {
 // Bump when the factory values change in a way existing users should receive.
 // Stored settings otherwise win over code defaults forever, so without this a
 // new default reaches nobody who has ever opened the popup.
-const CFG_VERSION = 3;
+const CFG_VERSION = 4;
 
 chrome.runtime.onInstalled.addListener(async () => {
   const st = await chrome.storage.sync.get({ cfgVersion: 0, ...FACTORY });

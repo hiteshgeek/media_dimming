@@ -38,7 +38,7 @@
     areaComp: 0.55,     // how much to lower the ceiling as bright area grows
     maxContrast: 3,     // cap brightest pixel at N x the scene's own level (0 = off)
     minCeiling: 0.10,   // contrast adaptation never pushes below this
-    clipEngine: 'blend', // 'blend' = darken layer | 'filter' = SVG curve on the video
+    clipEngine: 'filter',// 'filter' = colour-safe luma ceiling | 'blend' = fast per-channel
     flashCeil: 0.45,    // ceiling multiplier during a flash
     dimThumbs: true,    // apply the same ceiling to thumbnail images
     thumbCeiling: 0.45, // thumbnails are static, so this needs no adaptation
@@ -82,49 +82,77 @@
   // itself. Same path as the brightness filter, so it survives cases where a
   // blended overlay does not reach the video (hardware overlay planes,
   // fullscreen compositing, a stacking context we did not anticipate).
-  const NT = 17;   // table points; piecewise-linear between them
+  const NT = 33;   // table points; piecewise-linear between them
   const filters = {};   // filter id -> its [feFuncR, feFuncG, feFuncB]
 
+  // Colour-safe ceiling. Clipping each channel on its own destroys colour:
+  // skin at (240,190,170) under a 45% ceiling becomes (115,115,115), a flat
+  // grey, because all three channels slam into the same wall. Instead compute
+  // luminance, derive a single gain from it, and scale all three channels by
+  // that gain - brightness comes down, hue and saturation survive intact.
+  //
+  //   feColorMatrix      RGB := luma(RGB)
+  //   feComponentTransfer  g := min(1, ceiling / luma)
+  //   feComposite        out := SourceGraphic * g
   function buildFilter(id) {
     if (filters[id]) return true;
     // A filter: url() pointing at a filter that does not exist makes the
     // element not render at all, so never flag the class before this succeeds.
     if (!document.body) return false;
     const NS = 'http://www.w3.org/2000/svg';
-    const svg = document.createElementNS(NS, 'svg');
-    svg.setAttribute('width', '0'); svg.setAttribute('height', '0');
-    svg.setAttribute('aria-hidden', 'true');
+    const el = (tag, attrs) => {
+      const n = document.createElementNS(NS, tag);
+      for (const k in attrs) n.setAttribute(k, attrs[k]);
+      return n;
+    };
+    const svg = el('svg', { width: '0', height: '0', 'aria-hidden': 'true' });
     svg.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none';
-    const f = document.createElementNS(NS, 'filter');
-    f.setAttribute('id', id);
-    // sRGB, not the linearRGB default, so the curve matches the blend maths
-    f.setAttribute('color-interpolation-filters', 'sRGB');
-    const ct = document.createElementNS(NS, 'feComponentTransfer');
+
+    // sRGB, not the linearRGB default, so this matches the luma the sampler
+    // measures and the values the user sees in the meter.
+    const f = el('filter', { id: id, 'color-interpolation-filters': 'sRGB' });
+
+    const L = '0.2126 0.7152 0.0722 0 0 ';
+    f.appendChild(el('feColorMatrix', {
+      type: 'matrix', result: 'luma',
+      values: L + L + L + '0 0 0 0 1'
+    }));
+
+    const ct = el('feComponentTransfer', { in: 'luma', result: 'gain' });
     filters[id] = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
-      const fn = document.createElementNS(NS, tag);
-      fn.setAttribute('type', 'table');
+      const fn = el(tag, { type: 'table' });
       ct.appendChild(fn);
       return fn;
     });
-    f.appendChild(ct); svg.appendChild(f);
+    f.appendChild(ct);
+
+    f.appendChild(el('feComposite', {
+      in: 'SourceGraphic', in2: 'gain',
+      operator: 'arithmetic', k1: '1', k2: '0', k3: '0', k4: '0'
+    }));
+
+    svg.appendChild(f);
     document.body.appendChild(svg);
     return true;
+  }
+
+  // gain(luma) = 1 below the ceiling, ceiling/luma above it. Strength eases
+  // the whole curve back towards 1, giving a ratio rather than a brickwall.
+  function gainTable(c, s) {
+    const out = [];
+    for (let k = 0; k < NT; k++) {
+      const y = k / (NT - 1);
+      const g = y <= c ? 1 : c / y;
+      out.push((1 - s * (1 - g)).toFixed(4));
+    }
+    return out.join(' ');
   }
 
   function setTable(id, c, s) {
     const fns = filters[id];
     if (!fns) return;
-    const tv = filterTable(c, s);
+    const tv = gainTable(c, s);
     for (const fn of fns) fn.setAttribute('tableValues', tv);
-  }
-
-  function filterTable(c, s) {
-    const out = [];
-    for (let k = 0; k < NT; k++) {
-      const x = k / (NT - 1);
-      out.push((x * (1 - s) + Math.min(x, c) * s).toFixed(4));
-    }
-    return out.join(' ');
   }
 
   let lastCeilByte = -1;

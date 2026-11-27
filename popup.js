@@ -1,7 +1,7 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
-  maxContrast: 3, minCeiling: 0.10, clipEngine: 'blend',
+  maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
   dimThumbs: true, thumbCeiling: 0.45, thumbStrength: 1.0,
   ceiling: 0.35, maxDim: 0.80, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
@@ -93,7 +93,7 @@ function render() {
 
   $('e-blend').classList.toggle('sel', cfg.clipEngine !== 'filter');
   $('e-filter').classList.toggle('sel', cfg.clipEngine === 'filter');
-  $('seg2').dataset.sel = cfg.clipEngine === 'filter' ? '1' : '0';
+  $('seg2').dataset.sel = cfg.clipEngine === 'filter' ? '0' : '1';
 
   const hitPreset = Object.keys(PRESETS).find(n => matchesPreset(cfg, PRESETS[n])) || null;
   for (const n of Object.keys(PRESETS)) $('p-' + n).classList.toggle('sel', n === hitPreset);
