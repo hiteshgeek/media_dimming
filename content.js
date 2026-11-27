@@ -42,6 +42,7 @@
     flashCeil: 0.45,    // ceiling multiplier during a flash
     whiteStrict: 2,     // chroma penalty: higher exempts coloured pixels harder
     dimThumbs: true,    // apply the same ceiling to thumbnail images
+    thumbMatch: true,   // follow the video ceiling, so both match
     thumbCeiling: 0.45, // thumbnails are static, so this needs no adaptation
     thumbStrength: 1.0,
     ceiling: 0.35,      // whole-frame mode: target average level
@@ -216,7 +217,8 @@
     // curve on the page handles every one of them, with no DOM injection.
     const wantThumbs = cfg.enabled && cfg.dimThumbs && buildFilter('ml-thumbclip');
     if (wantThumbs) {
-      setTable('ml-thumbclip', clamp(cfg.thumbCeiling, 0.05, 1), clamp(cfg.thumbStrength, 0, 1));
+      const tc = cfg.thumbMatch ? cfg.hardCeiling : cfg.thumbCeiling;
+      setTable('ml-thumbclip', clamp(tc, 0.05, 1), clamp(cfg.thumbStrength, 0, 1));
     }
     root.classList.toggle('ml-thumbs', !!wantThumbs);
     if (!clipLayer) return;

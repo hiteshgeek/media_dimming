@@ -2,7 +2,7 @@ const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
-  whiteStrict: 2, dimThumbs: true, thumbCeiling: 0.45, thumbStrength: 1.0,
+  whiteStrict: 2, dimThumbs: true, thumbMatch: true, thumbCeiling: 0.45, thumbStrength: 1.0,
   ceiling: 0.35, maxDim: 0.80, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
   holdMs: 400, peakWeight: 0.45, sampleHz: 50
@@ -85,7 +85,9 @@ function render() {
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
   $('dimThumbs').checked = cfg.dimThumbs;
-  $('thumbCeiling').disabled = !cfg.dimThumbs;
+  $('thumbMatch').checked = cfg.thumbMatch;
+  $('thumbMatch').disabled = !cfg.dimThumbs;
+  $('thumbCeiling').disabled = !cfg.dimThumbs || cfg.thumbMatch;
 
   document.body.dataset.mode = cfg.mode;
   $('seg').dataset.sel = cfg.mode === 'dim' ? '1' : '0';
@@ -106,6 +108,13 @@ function render() {
     fill(el);
     $(id + 'v').textContent = fmt(cfg[id]);
   }
+  // after the slider loop, which would otherwise overwrite this label
+  if (cfg.thumbMatch) {
+    $('thumbCeiling').value = Math.round(cfg.hardCeiling * 100);
+    fill($('thumbCeiling'));
+    $('thumbCeilingv').textContent = Math.round(cfg.hardCeiling * 100) + '% from video';
+  }
+
   $('panel').classList.toggle('off', !cfg.enabled);
 
   renderSlots();
@@ -184,6 +193,11 @@ $('flashGuard').addEventListener('change', async (e) => {
 $('dimThumbs').addEventListener('change', async (e) => {
   CFG.dimThumbs = e.target.checked;
   await chrome.storage.sync.set({ dimThumbs: e.target.checked });
+  render();
+});
+$('thumbMatch').addEventListener('change', async (e) => {
+  CFG.thumbMatch = e.target.checked;
+  await chrome.storage.sync.set({ thumbMatch: e.target.checked });
   render();
 });
 $('testMode').addEventListener('change', async (e) => {
