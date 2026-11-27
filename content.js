@@ -40,7 +40,7 @@
     minCeiling: 0.10,   // contrast adaptation never pushes below this
     clipEngine: 'filter',// 'filter' = colour-safe luma ceiling | 'blend' = fast per-channel
     flashCeil: 0.45,    // ceiling multiplier during a flash
-    colourGuard: 0,     // 0 = dim white only, 1 = dim anything bright
+    whiteStrict: 2,     // chroma penalty: higher exempts coloured pixels harder
     dimThumbs: true,    // apply the same ceiling to thumbnail images
     thumbCeiling: 0.45, // thumbnails are static, so this needs no adaptation
     thumbStrength: 1.0,
@@ -84,21 +84,29 @@
   // blended overlay does not reach the video (hardware overlay planes,
   // fullscreen compositing, a stacking context we did not anticipate).
   const NT = 33;   // table points; piecewise-linear between them
-  const filters = {};   // filter id -> { funcs, mix }
+  const filters = {};   // filter id -> { funcs, meas }
 
-  // Dim white, not colour.
+  // Dim white. Nothing else.
   //
-  // Clipping channels independently turns skin grey. Clipping luminance keeps
-  // hue but still dims every bright pixel, colour included. What actually
-  // glares is the WHITE content of a pixel, and that is exactly min(R,G,B):
-  // 1.0 for white, 0.0 for a saturated orange, about 0.5 for skin. Clip on
-  // that and saturated colour passes through at full strength no matter how
-  // bright it is.
+  // Brightness alone is the wrong test: a saturated orange is bright and must
+  // not move. White content alone, min(R,G,B), is also wrong: skin measured
+  // (242,198,182) has a white content of 71%, so it dimmed almost as hard as
+  // white did. What separates white from everything else is that white has no
+  // chroma at all. So penalise chroma:
+  //
+  //   w = min(R,G,B)        white content
+  //   v = max(R,G,B)
+  //   chroma = v - w        any colour at all
+  //   measure = w - strict * chroma      clamped at 0
+  //
+  // That same skin scores 0.71 - 2x0.24 = 0.23, far under any usable ceiling,
+  // so it is untouched. True white has chroma 0 and keeps its full score, so
+  // it alone is clipped. No special cases, no face detection - one rule.
   //
   //   rr,gg,bb           channel splats
-  //   feBlend darken x2  w := min(R,G,B)        the white content
-  //   feColorMatrix      l := luma(RGB)
-  //   feComposite        m := (1-guard)*w + guard*l
+  //   feBlend darken x2  w := min(R,G,B)
+  //   feBlend lighten x2 v := max(R,G,B)
+  //   feComposite        m := (1+strict)*w - strict*v      (clamped to 0..1)
   //   feComponentTransfer  g := min(1, ceiling / m)
   //   feComposite        out := SourceGraphic * g
   function buildFilter(id) {
@@ -126,24 +134,21 @@
     f.appendChild(splat('1 0 0 0 0 ', 'rr'));
     f.appendChild(splat('0 1 0 0 0 ', 'gg'));
     f.appendChild(splat('0 0 1 0 0 ', 'bb'));
-    // feBlend darken is a per-channel min, so two of them reduce the three
-    // splats to min(R,G,B) in every channel.
-    f.appendChild(el('feBlend', { mode: 'darken', in: 'rr', in2: 'gg', result: 'rg' }));
-    f.appendChild(el('feBlend', { mode: 'darken', in: 'rg', in2: 'bb', result: 'white' }));
 
-    const L = '0.2126 0.7152 0.0722 0 0 ';
-    f.appendChild(el('feColorMatrix', {
-      in: 'SourceGraphic', type: 'matrix', result: 'lum',
-      values: L + L + L + '0 0 0 0 1'
-    }));
+    // darken and lighten are per-channel min and max, so two passes of each
+    // fold the three splats into min(R,G,B) and max(R,G,B).
+    f.appendChild(el('feBlend', { mode: 'darken',  in: 'rr', in2: 'gg', result: 'mn1' }));
+    f.appendChild(el('feBlend', { mode: 'darken',  in: 'mn1', in2: 'bb', result: 'wmin' }));
+    f.appendChild(el('feBlend', { mode: 'lighten', in: 'rr', in2: 'gg', result: 'mx1' }));
+    f.appendChild(el('feBlend', { mode: 'lighten', in: 'mx1', in2: 'bb', result: 'vmax' }));
 
-    // guard slides the measure from pure white content towards luminance,
-    // so bright colour can be brought back under the ceiling if wanted.
-    const mix = el('feComposite', {
-      in: 'white', in2: 'lum', operator: 'arithmetic',
-      k1: '0', k2: '1', k3: '0', k4: '0', result: 'meas'
+    // arithmetic clamps to 0..1, so anything with real chroma lands at zero
+    // and can never be clipped however bright it is.
+    const meas = el('feComposite', {
+      in: 'wmin', in2: 'vmax', operator: 'arithmetic',
+      k1: '0', k2: '3', k3: '-2', k4: '0', result: 'meas'
     });
-    f.appendChild(mix);
+    f.appendChild(meas);
 
     const ct = el('feComponentTransfer', { in: 'meas', result: 'gain' });
     const funcs = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
@@ -160,7 +165,7 @@
 
     svg.appendChild(f);
     document.body.appendChild(svg);
-    filters[id] = { funcs: funcs, mix: mix };
+    filters[id] = { funcs: funcs, meas: meas };
     return true;
   }
 
@@ -179,9 +184,9 @@
   function setTable(id, c, s) {
     const e = filters[id];
     if (!e) return;
-    const guard = clamp(cfg.colourGuard, 0, 1);
-    e.mix.setAttribute('k2', (1 - guard).toFixed(3));
-    e.mix.setAttribute('k3', guard.toFixed(3));
+    const k = clamp(cfg.whiteStrict, 0, 6);
+    e.meas.setAttribute('k2', (1 + k).toFixed(2));
+    e.meas.setAttribute('k3', (-k).toFixed(2));
     const tv = gainTable(c, s);
     for (const fn of e.funcs) fn.setAttribute('tableValues', tv);
   }

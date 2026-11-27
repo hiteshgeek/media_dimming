@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Media Layer — Brightness Limiter",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Adaptive brightness limiter for YouTube. Darkens blinding white frames and flashes in real time, like an audio limiter for light.",
   "permissions": ["storage"],
   "host_permissions": [
