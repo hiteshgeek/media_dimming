@@ -17,50 +17,74 @@ Works in Chrome, Edge, Brave, Opera and any other Chromium browser.
 
 ## How it works
 
-### Selective mode (default) - per pixel
+### What gets dimmed: white, and only white
 
-A grey layer with `mix-blend-mode: darken` over the video. Compositing makes
-this `min(pixel, ceiling)` on every pixel **independently**. Only pixels
-brighter than the ceiling move; everything already darker passes through
-untouched. A bright window in one corner of the frame gets capped while the
-rest of the shot is left exactly as it is. There is no global brightness
-change at all, so dark scenes are mathematically unaffected.
+Brightness is the wrong test. A saturated orange banner is bright and must
+not move; a white background must. What separates them is that white has no
+chroma, so the measure is
 
-The ceiling itself is dynamic, for two reasons:
+    measure = min(R,G,B) - strictness x (max(R,G,B) - min(R,G,B))
 
-- **Area.** A frame that is 90% white floods the eye far more than one with a
-  single bright lamp, even though both peak at the same value. So the ceiling
-  drops as the bright *fraction* of the frame grows. The fraction is measured
-  against the fixed nominal ceiling, never the effective one - measuring
-  against the effective ceiling would feed back on itself and run away.
-- **Flash.** A sudden jump in source luminance drops the ceiling hard for
-  400 ms, then releases. Still per pixel: the dark parts never change.
+clamped at zero. `min(R,G,B)` is the white content of a pixel - 1.0 for white,
+about 0.5 for skin, 0.0 for a saturated colour. Subtracting chroma pushes
+anything carrying real colour to zero, where no ceiling can touch it.
 
-### Whole frame mode - global
+Everything above the ceiling is then scaled by a single gain derived from that
+measure, so all three channels move together and hue survives. Clipping each
+channel on its own instead turns skin into flat grey, which is what an earlier
+version did.
 
-`filter: brightness()` on the video element, driven by `--ml-gain` from frame
-analysis with fast attack and slow release. Brings everything down evenly.
-Injected content-script CSS always applies, so this needs no DOM surgery.
+Bucketing a real thumbnail by how much colour each pixel carries, at the
+shipped defaults:
 
-### Measurement
+| chroma in the pixel | left at |
+|---|---|
+| 0-2%, true white | 49% |
+| 2-5%, near neutral | 77% |
+| 5-10%, off-white | 100% |
+| 10-20%, skin and cream | 100% |
+| anything more saturated | 100% |
 
-Every ~20 ms the frame is drawn into a 48x27 offscreen canvas and its Rec.709
-luma histogram computed. Canvas reads the *source* video, so analysis always
-sees the real signal rather than the already-limited result. Flash detection
-in particular must run on the source: measuring the post-ceiling signal
-squeezes it into a narrow range and makes the threshold fire on every
+### Where it is applied
+
+Both the player and every thumbnail on the page run the same curve, built from
+SVG filter primitives:
+
+    rr,gg,bb           channel splats
+    feBlend darken x2  w := min(R,G,B)
+    feBlend lighten x2 v := max(R,G,B)
+    feComposite        m := (1+strict)*w - strict*v      clamped to 0..1
+    feComponentTransfer  g := min(1, ceiling / m)
+    feComposite        out := SourceGraphic * g
+
+`min` and `max` across channels are not linear, so no single feColorMatrix can
+express them; `darken` and `lighten` are per-channel min and max, so folding
+three channel splats through them gets there.
+
+Thumbnails are static, so one filter in the page covers all of them with no
+sampling and no DOM injection - nothing to re-attach when YouTube rebuilds the
+feed. The player is excluded from that rule since it runs its own pipeline.
+
+### The video ceiling moves
+
+For video the ceiling adapts every frame. A 48x27 canvas readback gives a
+Rec.709 luma histogram of the source, and the ceiling drops when a large
+share of the frame is bright, since a mostly-white frame floods the eye more
+than a single bright lamp at the same peak. It also holds the brightest pixel
+to a multiple of the scene's own median, because on a dark shot the eye is
+adapted to the gloom and white titles still glare.
+
+A flash guard watches the source signal for sudden jumps and drops the ceiling
+hard for 400 ms. It has to watch the source: measuring the already-limited
+result squeezes it into a narrow range and makes the threshold fire on every
 ordinary cut, which pins the limiter down permanently.
 
-Both the layer and the filter are scoped so that **subtitles and player
-controls stay at full brightness**.
+### Schedule
 
-## Measured
-
-A real cut-to-white YouTube frame (film posters on a cream background)
-measures 81.7% mean luma with 85% of the frame above the ceiling. In
-Selective mode on the Night preset the ceiling drops to 17%, so the
-background is capped there while pixels already below it - the posters -
-stay at their original values throughout.
+By default the whole thing only runs between 10 pm and 6 am; outside that it
+turns itself off. The window can be set to any custom times, or to all day.
+Nothing fires when the clock crosses the edge, so the content script polls it
+every two seconds and switches over without needing a page reload.
 
 ## Controls
 
@@ -68,18 +92,20 @@ Three presets to start from: **Gentle**, **Night** (default), **Strict**.
 
 | Setting | What it does |
 |---|---|
-| **Brightness ceiling** | Hard cap. Nothing on screen may exceed this. Dark areas untouched. |
-| **Clip hardness** | Softer keeps more detail in bright areas, lets more light through. |
-| **Average scene target** | Level the adaptive stage aims to hold, after the ceiling. |
-| **Maximum extra dimming** | How far the adaptive stage may go. |
-| **Always-on dim** | A constant reduction applied to everything. |
-| **Recovery speed** | How slowly brightness returns. Slower = less pumping. |
-| **Flash guard** | Instant brickwall clamp on sudden luminance jumps. |
+| **Schedule** | 10 pm - 6 am, custom hours, or all day. Off outside the window. |
+| **Selective / Whole frame** | Per-pixel ceiling, or an even global dim. |
+| **Brightness ceiling** | How dark white is allowed to get. |
+| **White strictness** | How much a trace of colour exempts a pixel. Lower it to bring off-white down too. |
+| **Clip hardness** | Softer keeps bright-area detail, but passes more light. |
+| **Dark scene limit** | Holds the brightest pixel to a multiple of the scene's own level. |
+| **Large bright areas** | Tightens the ceiling as more of the frame goes bright. |
+| **Thumbnails** | Same curve on the feed, with its own ceiling or matched to the video. |
+| **Flash guard** | Instant clamp on sudden luminance jumps. |
 
-The popup meter shows the video's real brightness against what you are
-actually being shown.
+Up to five named presets can be saved. Every action that replaces settings
+wholesale is undoable.
 
-Shortcuts: `Alt+Shift+D` toggle, `Alt+Shift+Down/Up` dim more/less.
+Shortcuts: `Alt+Shift+D` toggle, `Alt+Shift+Down/Up` ceiling down/up.
 
 ## Known limits
 
@@ -88,7 +114,10 @@ Shortcuts: `Alt+Shift+D` toggle, `Alt+Shift+Down/Up` dim more/less.
   or second displayed frame, not before it. Eliminating this entirely requires
   buffered playback (see below).
 - **DRM content** (rented films, some music videos) returns unreadable pixels,
-  so the adaptive stage goes passive. The ceiling layer still works.
+  so the adaptive stage goes passive. The fixed ceiling still applies.
+- Reloading the extension orphans content scripts in open tabs, so the service
+  worker reloads matching tabs on update. Without that, every change looks like
+  it did nothing.
 - Only YouTube in the browser — not the mobile or TV app.
 
 ## Possible v2: true lookahead

@@ -128,6 +128,15 @@
   .saverow button:hover { filter: brightness(1.12); }
   .saverow button:disabled { opacity: .45; cursor: default; filter: none; }
 
+  .timerow { display: flex; gap: 8px; margin-top: 9px; }
+  .timerow label { flex: 1; font-size: 11px; color: var(--txt-2); }
+  .timerow input {
+    width: 100%; margin-top: 4px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 8px; padding: 6px 8px; color: var(--txt); font: inherit; font-size: 12px;
+  }
+  .timerow input:focus { outline: none; border-color: var(--acc); }
+  .timerow[hidden] { display: none; }
+
   .minirow { display: flex; gap: 14px; margin-top: 8px; }
   .minirow:empty, .minirow[hidden] { display: none; }
   .link {
@@ -326,6 +335,22 @@
       </div>
     </section>
 
+
+    <details id="schedsec">
+      <summary>Schedule <span class="val" id="schedsum" style="margin-left:auto"></span></summary>
+      <div class="dbody">
+        <div class="chips">
+          <button class="chip" id="s-night">10 pm – 6 am</button>
+          <button class="chip" id="s-custom">Custom</button>
+          <button class="chip" id="s-always">All day</button>
+        </div>
+        <div class="timerow" id="timerow" hidden>
+          <label for="startT">From<input type="time" id="startT"></label>
+          <label for="endT">To<input type="time" id="endT"></label>
+        </div>
+        <p class="hint" id="schedstate"></p>
+      </div>
+    </details>
 
     <details id="thumbsec">
       <summary>Thumbnails</summary>

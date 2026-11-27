@@ -28,5 +28,20 @@
         "titleBar.inactiveBackground": "#1d4f0399",
         "titleBar.inactiveForeground": "#e7e7e799"
     },
-    "peacock.color": "#1d4f03"
+    "peacock.color": "#1d4f03",
+    "workbench.colorTheme": "Shades of Purple",
+  "workbench.iconTheme": "material-icon-theme",
+  "workbench.editor.editorActionsLocation": "titleBar",
+  "workbench.editor.enablePreview": false,
+  "window.commandCenter": false,
+  "window.zoomLevel": 1.2,
+
+  // Editor settings
+  "editor.fontFamily": "MonoLisa",
+  "editor.fontLigatures": "'feat', 'ures', 'ss02', 'liga', 'frac'",
+  "editor.fontSize": 13,
+  "editor.lineHeight": 2,
+  "editor.fontVariations": true,
+  "editor.formatOnSave": true,
+  "editor.formatOnPaste": true,
 }

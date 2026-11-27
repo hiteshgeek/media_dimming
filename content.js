@@ -31,6 +31,9 @@
 
   const DEFAULTS = {
     enabled: true,
+    schedule: 'night',  // 'night' = 22:00-06:00 | 'custom' = startMin..endMin | 'always'
+    startMin: 22 * 60,  // minutes past midnight, local time
+    endMin: 6 * 60,
     mode: 'clip',       // 'clip' = per-pixel ceiling | 'dim' = global brightness
     testMode: false,
     hardCeiling: 0.28,  // no pixel may exceed this
@@ -77,6 +80,23 @@
 
   const clamp = (x, lo, hi) => (x < lo ? lo : x > hi ? hi : x);
   const root = document.documentElement;
+
+  const NIGHT_START = 22 * 60, NIGHT_END = 6 * 60;
+
+  // Whether the limiter should be doing anything at this moment. The master
+  // switch and the schedule both have to agree.
+  function isActive() {
+    if (!cfg.enabled) return false;
+    if (cfg.schedule === 'always') return true;
+    const custom = cfg.schedule === 'custom';
+    const a = custom ? cfg.startMin : NIGHT_START;
+    const b = custom ? cfg.endMin : NIGHT_END;
+    if (a === b) return true;                    // an empty window means all day
+    const d = new Date();
+    const m = d.getHours() * 60 + d.getMinutes();
+    // b < a means the window runs through midnight
+    return a < b ? (m >= a && m < b) : (m >= a || m < b);
+  }
 
   function setGain(g) { root.style.setProperty('--ml-gain', g.toFixed(3)); }
 
@@ -206,16 +226,17 @@
 
   // Everything that depends only on settings, not on the current frame.
   function applyStatic() {
-    root.classList.toggle('ml-active', !!cfg.enabled);
-    if (!cfg.enabled) setGain(1);
-    const wantFilter = cfg.enabled && cfg.mode === 'clip' && !cfg.testMode
+    const on = isActive();
+    root.classList.toggle('ml-active', on);
+    if (!on) setGain(1);
+    const wantFilter = on && cfg.mode === 'clip' && !cfg.testMode
                        && cfg.clipEngine === 'filter';
     root.classList.toggle('ml-clipfilter', wantFilter && buildFilter('ml-clip'));
     lastCeilByte = -1;
 
     // Thumbnails are static images, so they need no sampling - one transfer
     // curve on the page handles every one of them, with no DOM injection.
-    const wantThumbs = cfg.enabled && cfg.dimThumbs && buildFilter('ml-thumbclip');
+    const wantThumbs = on && cfg.dimThumbs && buildFilter('ml-thumbclip');
     if (wantThumbs) {
       const tc = cfg.thumbMatch ? cfg.hardCeiling : cfg.thumbCeiling;
       setTable('ml-thumbclip', clamp(tc, 0.05, 1), clamp(cfg.thumbStrength, 0, 1));
@@ -223,8 +244,8 @@
     root.classList.toggle('ml-thumbs', !!wantThumbs);
     if (!clipLayer) return;
     // Test mode always uses the overlay, since proving attachment is its job.
-    const useLayer = cfg.enabled && cfg.clipEngine !== 'filter'
-                     && (cfg.mode === 'clip' || cfg.testMode) || (cfg.enabled && cfg.testMode);
+    const useLayer = on && cfg.clipEngine !== 'filter'
+                     && (cfg.mode === 'clip' || cfg.testMode) || (on && cfg.testMode);
     clipLayer.classList.toggle('ml-test', !!cfg.testMode);
     clipLayer.style.opacity = useLayer ? clamp(cfg.clipStrength, 0, 1).toFixed(3) : '0';
   }
@@ -325,10 +346,19 @@
     return Math.abs(target - next) < 0.004 ? target : next;
   }
 
+  let lastSchedCheck = -1e9, active = false;
+
   function tick(ts) {
     requestAnimationFrame(tick);
 
-    if (!cfg.enabled) return;
+    // No event fires when the clock crosses the window edge, so poll it. Two
+    // seconds is far finer than a one-minute boundary needs.
+    if (ts - lastSchedCheck > 2000) {
+      lastSchedCheck = ts;
+      const now = isActive();
+      if (now !== active) { active = now; applyStatic(); }
+    }
+    if (!active) return;
     const interval = 1000 / Math.max(10, Math.min(60, cfg.sampleHz));
     if (ts - lastTick < interval) return;
     const dt = Math.min(250, lastTick ? ts - lastTick : interval);
@@ -435,6 +465,7 @@
   chrome.runtime.onMessage.addListener((msg, _sender, respond) => {
     if (msg && msg.type === 'ml-status') {
       respond({
+        active: isActive(),
         hasVideo: state.hasVideo,
         attached: cfg.clipEngine === 'filter' ? !!filters['ml-clip'] : state.attached,
         readable: state.readable,

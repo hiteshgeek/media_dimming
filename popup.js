@@ -1,5 +1,6 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
+  schedule: 'night', startMin: 22 * 60, endMin: 6 * 60,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
   whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
@@ -36,6 +37,26 @@ const SLIDERS = {
 };
 
 const $ = id => document.getElementById(id);
+
+const NIGHT_START = 22 * 60, NIGHT_END = 6 * 60;
+const hhmm = m => String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+const pretty = m => {
+  const h = Math.floor(m / 60) % 24, mi = m % 60;
+  const ap = h < 12 ? 'am' : 'pm';
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return h12 + (mi ? ':' + String(mi).padStart(2, '0') : '') + ' ' + ap;
+};
+function windowOf(cfg) {
+  if (cfg.schedule === 'always') return null;
+  const custom = cfg.schedule === 'custom';
+  return [custom ? cfg.startMin : NIGHT_START, custom ? cfg.endMin : NIGHT_END];
+}
+function inWindow(cfg) {
+  const w = windowOf(cfg);
+  if (!w || w[0] === w[1]) return true;
+  const d = new Date(), m = d.getHours() * 60 + d.getMinutes();
+  return w[0] < w[1] ? (m >= w[0] && m < w[1]) : (m >= w[0] || m < w[1]);
+}
 const snap = c => Object.fromEntries(TUNABLE.map(k => [k, c[k]]));
 
 function sameCfg(a, b) {
@@ -116,6 +137,19 @@ function render() {
   }
 
   $('panel').classList.toggle('off', !cfg.enabled);
+
+  for (const k of ['night', 'custom', 'always']) {
+    $('s-' + k).classList.toggle('sel', cfg.schedule === k);
+  }
+  $('timerow').hidden = cfg.schedule !== 'custom';
+  $('startT').value = hhmm(cfg.startMin);
+  $('endT').value = hhmm(cfg.endMin);
+  const w = windowOf(cfg);
+  $('schedsum').textContent = w ? pretty(w[0]) + ' – ' + pretty(w[1]) : 'all day';
+  const live = inWindow(cfg);
+  $('schedstate').textContent = !cfg.enabled ? 'Turned off by the main switch.'
+    : live ? 'Within the window now, so it is running.'
+    : 'Outside the window, so it is off until ' + pretty(w[0]) + '.';
 
   renderSlots();
 
@@ -200,6 +234,22 @@ $('thumbMatch').addEventListener('change', async (e) => {
   await chrome.storage.sync.set({ thumbMatch: e.target.checked });
   render();
 });
+for (const k of ['night', 'custom', 'always']) {
+  $('s-' + k).addEventListener('click', () => setKey('schedule', k));
+}
+const toMin = v => {
+  const p = (v || '').split(':');
+  if (p.length !== 2) return null;
+  const m = (+p[0]) * 60 + (+p[1]);
+  return isFinite(m) ? m : null;
+};
+$('startT').addEventListener('change', e => {
+  const m = toMin(e.target.value); if (m !== null) setKey('startMin', m);
+});
+$('endT').addEventListener('change', e => {
+  const m = toMin(e.target.value); if (m !== null) setKey('endMin', m);
+});
+
 $('testMode').addEventListener('change', async (e) => {
   CFG.testMode = e.target.checked;
   await chrome.storage.sync.set({ testMode: e.target.checked });
@@ -268,7 +318,8 @@ async function poll() {
         ? pct(r.brightArea) + '% over ceiling · scene level ' + pct(r.ambient) + '% · capped at ' + pct(r.ceiling) + '%'
         : 'Whole frame dimmed by ' + pct(r.dim) + '%';
 
-    if (!r.hasVideo) setStatus('', 'No video on this tab');
+    if (r.active === false) setStatus('warn', 'Outside the schedule — not dimming');
+    else if (!r.hasVideo) setStatus('', 'No video on this tab');
     else if (!r.attached) setStatus('bad', 'Layer not attached to the player');
     else if (!r.readable) setStatus('warn', 'Pixels unreadable (DRM) — ceiling still applies');
     else setStatus('ok', 'Active');

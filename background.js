@@ -2,6 +2,7 @@
 // There is exactly one set of defaults; Reset returns here.
 const FACTORY = {
   mode: 'clip',
+  schedule: 'night', startMin: 22 * 60, endMin: 6 * 60,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter', flashCeil: 0.45,
   whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
