@@ -2,7 +2,7 @@ const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
-  whiteStrict: 2, dimThumbs: true, thumbMatch: true, thumbCeiling: 0.45, thumbStrength: 1.0,
+  whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
   ceiling: 0.35, maxDim: 0.80, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
   holdMs: 400, peakWeight: 0.45, sampleHz: 50

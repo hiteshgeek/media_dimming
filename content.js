@@ -40,9 +40,9 @@
     minCeiling: 0.10,   // contrast adaptation never pushes below this
     clipEngine: 'filter',// 'filter' = colour-safe luma ceiling | 'blend' = fast per-channel
     flashCeil: 0.45,    // ceiling multiplier during a flash
-    whiteStrict: 2,     // chroma penalty: higher exempts coloured pixels harder
+    whiteStrict: 10,    // chroma penalty: only near-neutral whites are dimmed
     dimThumbs: true,    // apply the same ceiling to thumbnail images
-    thumbMatch: true,   // follow the video ceiling, so both match
+    thumbMatch: false,  // true = follow the video ceiling instead
     thumbCeiling: 0.45, // thumbnails are static, so this needs no adaptation
     thumbStrength: 1.0,
     ceiling: 0.35,      // whole-frame mode: target average level
