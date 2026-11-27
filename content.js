@@ -31,6 +31,9 @@
 
   const DEFAULTS = {
     enabled: true,
+    dimPages: true,     // dim ordinary sites, not just YouTube
+    pageCeiling: 0.45,  // ceiling used for whole-page dimming
+    siteOff: [],        // hostnames to leave alone
     schedule: 'night',  // 'night' = 22:00-06:00 | 'custom' = startMin..endMin | 'always'
     startMin: 22 * 60,  // minutes past midnight, local time
     endMin: 6 * 60,
@@ -68,7 +71,6 @@
   };
   let announced = false;
 
-  chrome.storage.sync.get(DEFAULTS, (v) => { cfg = { ...DEFAULTS, ...v }; applyStatic(); });
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area !== 'sync') return;
     // Only known settings; the popup also stores slots and undo state here.
@@ -82,6 +84,12 @@
   const root = document.documentElement;
 
   const NIGHT_START = 22 * 60, NIGHT_END = 6 * 60;
+
+  // YouTube gets the per-frame video pipeline; everywhere else gets the veil.
+  // Running both on YouTube would dim it twice.
+  const isYT = /(^|\.)(youtube|youtube-nocookie)\.com$/i.test(location.hostname);
+  const siteAllowed = () =>
+    !(cfg.siteOff || []).some(h => h === location.hostname);
 
   // Whether the limiter should be doing anything at this moment. The master
   // switch and the schedule both have to agree.
@@ -227,16 +235,18 @@
   // Everything that depends only on settings, not on the current frame.
   function applyStatic() {
     const on = isActive();
-    root.classList.toggle('ml-active', on);
+    root.classList.toggle('ml-yt', isYT);
+    root.classList.toggle('ml-active', on && isYT);
+    ensureVeil(on);
     if (!on) setGain(1);
-    const wantFilter = on && cfg.mode === 'clip' && !cfg.testMode
+    const wantFilter = on && isYT && cfg.mode === 'clip' && !cfg.testMode
                        && cfg.clipEngine === 'filter';
     root.classList.toggle('ml-clipfilter', wantFilter && buildFilter('ml-clip'));
     lastCeilByte = -1;
 
     // Thumbnails are static images, so they need no sampling - one transfer
     // curve on the page handles every one of them, with no DOM injection.
-    const wantThumbs = on && cfg.dimThumbs && buildFilter('ml-thumbclip');
+    const wantThumbs = on && isYT && cfg.dimThumbs && buildFilter('ml-thumbclip');
     if (wantThumbs) {
       const tc = cfg.thumbMatch ? cfg.hardCeiling : cfg.thumbCeiling;
       setTable('ml-thumbclip', clamp(tc, 0.05, 1), clamp(cfg.thumbStrength, 0, 1));
@@ -248,6 +258,25 @@
                      && (cfg.mode === 'clip' || cfg.testMode) || (on && cfg.testMode);
     clipLayer.classList.toggle('ml-test', !!cfg.testMode);
     clipLayer.style.opacity = useLayer ? clamp(cfg.clipStrength, 0, 1).toFixed(3) : '0';
+  }
+
+  // ---- whole-page veil ------------------------------------------------
+  let veil = null;
+
+  function ensureVeil(on) {
+    const want = on && !isYT && cfg.dimPages && siteAllowed();
+    if (!want) {
+      if (veil) { veil.remove(); veil = null; }
+      return;
+    }
+    if (!buildFilter('ml-page')) return;      // nothing to reference yet
+    setTable('ml-page', clamp(cfg.pageCeiling, 0.05, 1), 1);
+    if (veil && veil.isConnected) return;
+    if (!document.body) return;
+    veil = document.createElement('div');
+    veil.className = 'ml-page-veil';
+    veil.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(veil);
   }
 
   // ---- frame sampling -------------------------------------------------
@@ -357,8 +386,11 @@
       lastSchedCheck = ts;
       const now = isActive();
       if (now !== active) { active = now; applyStatic(); }
+      // a page may replace body wholesale, so re-assert the veil
+      else if (active && !isYT && (!veil || !veil.isConnected)) applyStatic();
     }
     if (!active) return;
+    if (!isYT) return;          // ordinary sites need nothing per frame
     const interval = 1000 / Math.max(10, Math.min(60, cfg.sampleHz));
     if (ts - lastTick < interval) return;
     const dt = Math.min(250, lastTick ? ts - lastTick : interval);
@@ -452,6 +484,10 @@
     if (selective) setCeiling(state.effCeiling);
   }
 
+  // Load settings last: the callback touches everything above, and a
+  // synchronous implementation would otherwise run before the consts exist.
+  chrome.storage.sync.get(DEFAULTS, (v) => { cfg = { ...DEFAULTS, ...v }; applyStatic(); });
+
   applyStatic();
   requestAnimationFrame(tick);
 
@@ -466,6 +502,9 @@
     if (msg && msg.type === 'ml-status') {
       respond({
         active: isActive(),
+        site: location.hostname,
+        siteDimmed: !isYT && cfg.dimPages && siteAllowed(),
+        isYouTube: isYT,
         hasVideo: state.hasVideo,
         attached: cfg.clipEngine === 'filter' ? !!filters['ml-clip'] : state.attached,
         readable: state.readable,

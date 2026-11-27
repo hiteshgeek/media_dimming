@@ -3,6 +3,7 @@
 const FACTORY = {
   mode: 'clip',
   schedule: 'night', startMin: 22 * 60, endMin: 6 * 60,
+  dimPages: true, pageCeiling: 0.45,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter', flashCeil: 0.45,
   whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
@@ -33,7 +34,7 @@ chrome.runtime.onInstalled.addListener(async () => {
 async function refreshTabs() {
   try {
     const tabs = await chrome.tabs.query({
-      url: ['https://www.youtube.com/*', 'https://m.youtube.com/*', 'https://www.youtube-nocookie.com/*']
+      url: ['http://*/*', 'https://*/*']
     });
     for (const t of tabs) {
       try { await chrome.tabs.reload(t.id, { bypassCache: false }); } catch (e) { /* tab went away */ }

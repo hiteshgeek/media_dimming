@@ -1,6 +1,7 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   schedule: 'night', startMin: 22 * 60, endMin: 6 * 60,
+  dimPages: true, pageCeiling: 0.45, siteOff: [],
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
   whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
@@ -11,7 +12,8 @@ const DEFAULTS = {
 
 // Everything that makes up a "setting". Leaves out enabled and testMode,
 // which are operational switches rather than tuning.
-const TUNABLE = Object.keys(DEFAULTS).filter(k => k !== 'enabled' && k !== 'testMode');
+const NOT_TUNABLE = ['enabled', 'testMode', 'siteOff', 'schedule', 'startMin', 'endMin'];
+const TUNABLE = Object.keys(DEFAULTS).filter(k => !NOT_TUNABLE.includes(k));
 const META = { slots: [], undoCfg: null };
 const MAX_SLOTS = 5;
 
@@ -28,6 +30,7 @@ const SLIDERS = {
   maxContrast:  [v => v / 10,  v => Math.round(v * 10),  v => v <= 0.05 ? 'off' : v.toFixed(1) + '× scene'],
   areaComp:     [v => v / 100, v => Math.round(v * 100), v => v <= 0.01 ? 'off' : Math.round(v * 100) + '%'],
   thumbCeiling: [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
+  pageCeiling:  [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   whiteStrict:  [v => v / 100, v => Math.round(v * 100), v => v <= 0.05 ? 'any bright pixel' : '×' + v.toFixed(1) + ' chroma'],
   ceiling:      [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   maxDim:       [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
@@ -105,6 +108,8 @@ function render() {
   $('enabled').checked = cfg.enabled;
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
+  $('dimPages').checked = cfg.dimPages;
+  $('pageCeiling').disabled = !cfg.dimPages;
   $('dimThumbs').checked = cfg.dimThumbs;
   $('thumbMatch').checked = cfg.thumbMatch;
   $('thumbMatch').disabled = !cfg.dimThumbs;
@@ -229,6 +234,19 @@ $('dimThumbs').addEventListener('change', async (e) => {
   await chrome.storage.sync.set({ dimThumbs: e.target.checked });
   render();
 });
+$('dimPages').addEventListener('change', async (e) => {
+  CFG.dimPages = e.target.checked;
+  await chrome.storage.sync.set({ dimPages: e.target.checked });
+  render();
+});
+$('siteOn').addEventListener('change', async (e) => {
+  const host = $('siteOn').dataset.host;
+  if (!host) return;
+  const cur = await chrome.storage.sync.get({ siteOff: [] });
+  const off = new Set(cur.siteOff);
+  if (e.target.checked) off.delete(host); else off.add(host);
+  await chrome.storage.sync.set({ siteOff: [...off] });
+});
 $('thumbMatch').addEventListener('change', async (e) => {
   CFG.thumbMatch = e.target.checked;
   await chrome.storage.sync.set({ thumbMatch: e.target.checked });
@@ -318,6 +336,12 @@ async function poll() {
         ? pct(r.brightArea) + '% over ceiling · scene level ' + pct(r.ambient) + '% · capped at ' + pct(r.ceiling) + '%'
         : 'Whole frame dimmed by ' + pct(r.dim) + '%';
 
+    if (r.site) {
+      $('siterow').hidden = !!r.isYouTube;
+      $('siteOn').dataset.host = r.site;
+      $('siteOn').checked = !!r.siteDimmed;
+      $('sitename').textContent = r.site;
+    }
     if (r.active === false) setStatus('warn', 'Outside the schedule — not dimming');
     else if (!r.hasVideo) setStatus('', 'No video on this tab');
     else if (!r.attached) setStatus('bad', 'Layer not attached to the player');

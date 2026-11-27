@@ -352,6 +352,29 @@
       </div>
     </details>
 
+    <details id="pagesec">
+      <summary>Other websites</summary>
+      <div class="dbody">
+        <label class="tgl">
+          <input type="checkbox" id="dimPages">
+          <span class="track"><span class="knob"></span></span>
+          <span class="tgl-l">Dim every site</span>
+        </label>
+        <p class="hint">Same white-only rule across the whole page, applied behind a fixed overlay so layouts and sticky headers are untouched.</p>
+
+        <div class="ctl">
+          <div class="lbl"><label for="pageCeiling">Page ceiling</label><span class="v" id="pageCeilingv"></span></div>
+          <input type="range" id="pageCeiling" min="8" max="100" step="1">
+        </div>
+
+        <label class="tgl" id="siterow" style="margin-top:12px" hidden>
+          <input type="checkbox" id="siteOn">
+          <span class="track"><span class="knob"></span></span>
+          <span class="tgl-l">Dim <b id="sitename" style="font-weight:600"></b></span>
+        </label>
+      </div>
+    </details>
+
     <details id="thumbsec">
       <summary>Thumbnails</summary>
       <div class="dbody">

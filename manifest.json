@@ -1,26 +1,30 @@
 {
   "manifest_version": 3,
-  "name": "Media Layer — Brightness Limiter",
-  "version": "1.9.0",
-  "description": "Adaptive brightness limiter for YouTube. Darkens blinding white frames and flashes in real time, like an audio limiter for light.",
-  "permissions": ["storage"],
-  "host_permissions": [
-    "https://www.youtube.com/*",
-    "https://m.youtube.com/*",
-    "https://www.youtube-nocookie.com/*"
+  "name": "Media Layer \u2014 Brightness Limiter",
+  "version": "2.0.0",
+  "description": "Dims glaring white on YouTube and every other site, on a night schedule. Colour is left alone.",
+  "permissions": [
+    "storage"
   ],
-  "background": { "service_worker": "background.js" },
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
   "content_scripts": [
     {
       "matches": [
-        "https://www.youtube.com/*",
-        "https://m.youtube.com/*",
-        "https://www.youtube-nocookie.com/*"
+        "<all_urls>"
       ],
-      "js": ["content.js"],
-      "css": ["overlay.css"],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "overlay.css"
+      ],
       "run_at": "document_start",
-      "all_frames": true
+      "all_frames": false
     }
   ],
   "icons": {
@@ -41,15 +45,21 @@
   },
   "commands": {
     "toggle-enabled": {
-      "suggested_key": { "default": "Alt+Shift+D" },
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
       "description": "Turn Media Layer on/off"
     },
     "nudge-darker": {
-      "suggested_key": { "default": "Alt+Shift+Down" },
+      "suggested_key": {
+        "default": "Alt+Shift+Down"
+      },
       "description": "Dim more"
     },
     "nudge-lighter": {
-      "suggested_key": { "default": "Alt+Shift+Up" },
+      "suggested_key": {
+        "default": "Alt+Shift+Up"
+      },
       "description": "Dim less"
     }
   }

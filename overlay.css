@@ -1,13 +1,29 @@
+/* Whole-page dimming for ordinary sites.
+
+   A fixed overlay with backdrop-filter filters everything painted behind it,
+   including iframes, without becoming a containing block for anything. A
+   filter on <html> would do the same dimming but makes position: fixed
+   descendants scroll with the page, breaking sticky headers on most sites -
+   measured, not assumed. */
+.ml-page-veil {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2147483647;
+  backdrop-filter: url(#ml-page);
+  -webkit-backdrop-filter: url(#ml-page);
+}
+
 /* Primary mechanism: the gain is a brightness filter on the video element
    itself, driven by a custom property. Injected content-script CSS always
    applies, so this does not depend on YouTube's DOM structure at all. */
-html.ml-active video {
+html.ml-active.ml-yt video {
   filter: brightness(var(--ml-gain, 1)) !important;
 }
 
 /* Filter clip engine: a transfer curve on the video itself, for cases where a
    blended overlay never reaches the video. Must follow the rule above. */
-html.ml-active.ml-clipfilter video {
+html.ml-active.ml-yt.ml-clipfilter video {
   filter: brightness(var(--ml-gain, 1)) url(#ml-clip) !important;
 }
 
