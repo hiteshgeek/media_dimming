@@ -1,7 +1,7 @@
 const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   schedule: 'night', startMin: 22 * 60, endMin: 6 * 60,
-  dimPages: true, pageCeiling: 0.45, siteOff: [],
+  dimPages: true, pageMode: 'uniform', pageLevel: 0.72, pageCeiling: 0.45, siteOff: [],
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter',
   whiteStrict: 10, dimThumbs: true, thumbMatch: false, thumbCeiling: 0.45, thumbStrength: 1.0,
@@ -31,6 +31,7 @@ const SLIDERS = {
   areaComp:     [v => v / 100, v => Math.round(v * 100), v => v <= 0.01 ? 'off' : Math.round(v * 100) + '%'],
   thumbCeiling: [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   pageCeiling:  [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
+  pageLevel:    [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   whiteStrict:  [v => v / 100, v => Math.round(v * 100), v => v <= 0.05 ? 'any bright pixel' : '×' + v.toFixed(1) + ' chroma'],
   ceiling:      [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   maxDim:       [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
@@ -109,7 +110,15 @@ function render() {
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
   $('dimPages').checked = cfg.dimPages;
+  const whites = cfg.pageMode === 'white';
+  $('pm-uniform').classList.toggle('sel', !whites);
+  $('pm-white').classList.toggle('sel', whites);
+  $('seg3').dataset.sel = whites ? '1' : '0';
+  $('pagerow-u').hidden = whites;
+  $('pagerow-w').hidden = !whites;
+  $('pageLevel').disabled = !cfg.dimPages;
   $('pageCeiling').disabled = !cfg.dimPages;
+  $('pagewarn').hidden = whites || cfg.pageLevel >= 0.65;
   $('dimThumbs').checked = cfg.dimThumbs;
   $('thumbMatch').checked = cfg.thumbMatch;
   $('thumbMatch').disabled = !cfg.dimThumbs;
@@ -234,6 +243,8 @@ $('dimThumbs').addEventListener('change', async (e) => {
   await chrome.storage.sync.set({ dimThumbs: e.target.checked });
   render();
 });
+$('pm-uniform').addEventListener('click', () => setKey('pageMode', 'uniform'));
+$('pm-white').addEventListener('click', () => setKey('pageMode', 'white'));
 $('dimPages').addEventListener('change', async (e) => {
   CFG.dimPages = e.target.checked;
   await chrome.storage.sync.set({ dimPages: e.target.checked });

@@ -32,7 +32,9 @@
   const DEFAULTS = {
     enabled: true,
     dimPages: true,     // dim ordinary sites, not just YouTube
-    pageCeiling: 0.45,  // ceiling used for whole-page dimming
+    pageMode: 'uniform',// 'uniform' = dim the page evenly | 'white' = whites only
+    pageLevel: 0.72,    // uniform brightness. Below ~0.65 body text stops being legible
+    pageCeiling: 0.45,  // ceiling used by whites-only page mode
     siteOff: [],        // hostnames to leave alone
     schedule: 'night',  // 'night' = 22:00-06:00 | 'custom' = startMin..endMin | 'always'
     startMin: 22 * 60,  // minutes past midnight, local time
@@ -269,12 +271,17 @@
       if (veil) { veil.remove(); veil = null; }
       return;
     }
-    if (!buildFilter('ml-page')) return;      // nothing to reference yet
-    setTable('ml-page', clamp(cfg.pageCeiling, 0.05, 1), 1);
-    if (veil && veil.isConnected) return;
+    const whites = cfg.pageMode === 'white';
+    if (whites) {
+      if (!buildFilter('ml-page')) return;    // nothing to reference yet
+      setTable('ml-page', clamp(cfg.pageCeiling, 0.05, 1), 1);
+    } else {
+      root.style.setProperty('--ml-page-level', clamp(cfg.pageLevel, 0.2, 1).toFixed(3));
+    }
+    if (veil && veil.isConnected) { veil.classList.toggle('ml-white', whites); return; }
     if (!document.body) return;
     veil = document.createElement('div');
-    veil.className = 'ml-page-veil';
+    veil.className = 'ml-page-veil' + (whites ? ' ml-white' : '');
     veil.setAttribute('aria-hidden', 'true');
     document.body.appendChild(veil);
   }

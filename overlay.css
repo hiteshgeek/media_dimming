@@ -10,6 +10,14 @@
   inset: 0;
   pointer-events: none;
   z-index: 2147483647;
+  backdrop-filter: brightness(var(--ml-page-level, 1));
+  -webkit-backdrop-filter: brightness(var(--ml-page-level, 1));
+}
+
+/* Whites-only on a page of text collapses contrast: the background drops
+   while the text, having no white content, correctly does not move. Good for
+   pages that are mostly pictures, bad for anything you read. */
+.ml-page-veil.ml-white {
   backdrop-filter: url(#ml-page);
   -webkit-backdrop-filter: url(#ml-page);
 }

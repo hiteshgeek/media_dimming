@@ -362,9 +362,22 @@
         </label>
         <p class="hint">Same white-only rule across the whole page, applied behind a fixed overlay so layouts and sticky headers are untouched.</p>
 
-        <div class="ctl">
+        <div class="seg" id="seg3" data-sel="0" style="margin-top:11px">
+          <button id="pm-uniform">Dim evenly</button>
+          <button id="pm-white">Whites only</button>
+        </div>
+
+        <div class="ctl" id="pagerow-u">
+          <div class="lbl"><label for="pageLevel">Page brightness</label><span class="v" id="pageLevelv"></span></div>
+          <input type="range" id="pageLevel" min="20" max="100" step="1">
+          <p class="hint">Dims text and background together, so what you read stays legible.</p>
+          <p class="hint" id="pagewarn" style="color:#e8a33d" hidden>Below about 65% the body text on most sites drops under the readable contrast threshold.</p>
+        </div>
+
+        <div class="ctl" id="pagerow-w" hidden>
           <div class="lbl"><label for="pageCeiling">Page ceiling</label><span class="v" id="pageCeilingv"></span></div>
           <input type="range" id="pageCeiling" min="8" max="100" step="1">
+          <p class="hint">Keeps colour vivid, but on a page of text the background drops while the text does not, which collapses contrast. Best for picture-heavy sites.</p>
         </div>
 
         <label class="tgl" id="siterow" style="margin-top:12px" hidden>
