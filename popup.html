@@ -354,6 +354,12 @@
         <p class="hint">Softer keeps bright-area detail, but passes more light.</p>
       </div>
 
+      <div class="ctl">
+        <div class="lbl"><label for="colourGuard">Dim colour too</label><span class="v" id="colourGuardv"></span></div>
+        <input type="range" id="colourGuard" min="0" max="100" step="1">
+        <p class="hint">At "whites only" a saturated colour is never dimmed however bright it is. Raise this to bring bright colour under the ceiling as well.</p>
+      </div>
+
       <div class="ctl only-clip">
         <div class="lbl"><label for="maxContrast">Dark scene limit</label><span class="v" id="maxContrastv"></span></div>
         <input type="range" id="maxContrast" min="0" max="120" step="1">

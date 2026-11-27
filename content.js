@@ -40,6 +40,7 @@
     minCeiling: 0.10,   // contrast adaptation never pushes below this
     clipEngine: 'filter',// 'filter' = colour-safe luma ceiling | 'blend' = fast per-channel
     flashCeil: 0.45,    // ceiling multiplier during a flash
+    colourGuard: 0,     // 0 = dim white only, 1 = dim anything bright
     dimThumbs: true,    // apply the same ceiling to thumbnail images
     thumbCeiling: 0.45, // thumbnails are static, so this needs no adaptation
     thumbStrength: 1.0,
@@ -83,16 +84,22 @@
   // blended overlay does not reach the video (hardware overlay planes,
   // fullscreen compositing, a stacking context we did not anticipate).
   const NT = 33;   // table points; piecewise-linear between them
-  const filters = {};   // filter id -> its [feFuncR, feFuncG, feFuncB]
+  const filters = {};   // filter id -> { funcs, mix }
 
-  // Colour-safe ceiling. Clipping each channel on its own destroys colour:
-  // skin at (240,190,170) under a 45% ceiling becomes (115,115,115), a flat
-  // grey, because all three channels slam into the same wall. Instead compute
-  // luminance, derive a single gain from it, and scale all three channels by
-  // that gain - brightness comes down, hue and saturation survive intact.
+  // Dim white, not colour.
   //
-  //   feColorMatrix      RGB := luma(RGB)
-  //   feComponentTransfer  g := min(1, ceiling / luma)
+  // Clipping channels independently turns skin grey. Clipping luminance keeps
+  // hue but still dims every bright pixel, colour included. What actually
+  // glares is the WHITE content of a pixel, and that is exactly min(R,G,B):
+  // 1.0 for white, 0.0 for a saturated orange, about 0.5 for skin. Clip on
+  // that and saturated colour passes through at full strength no matter how
+  // bright it is.
+  //
+  //   rr,gg,bb           channel splats
+  //   feBlend darken x2  w := min(R,G,B)        the white content
+  //   feColorMatrix      l := luma(RGB)
+  //   feComposite        m := (1-guard)*w + guard*l
+  //   feComponentTransfer  g := min(1, ceiling / m)
   //   feComposite        out := SourceGraphic * g
   function buildFilter(id) {
     if (filters[id]) return true;
@@ -108,18 +115,38 @@
     const svg = el('svg', { width: '0', height: '0', 'aria-hidden': 'true' });
     svg.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none';
 
-    // sRGB, not the linearRGB default, so this matches the luma the sampler
-    // measures and the values the user sees in the meter.
+    // sRGB, not the linearRGB default, so this matches the values the sampler
+    // measures and the meter reports.
     const f = el('filter', { id: id, 'color-interpolation-filters': 'sRGB' });
+
+    const splat = (row, result) => el('feColorMatrix', {
+      in: 'SourceGraphic', type: 'matrix', result: result,
+      values: row + row + row + '0 0 0 0 1'
+    });
+    f.appendChild(splat('1 0 0 0 0 ', 'rr'));
+    f.appendChild(splat('0 1 0 0 0 ', 'gg'));
+    f.appendChild(splat('0 0 1 0 0 ', 'bb'));
+    // feBlend darken is a per-channel min, so two of them reduce the three
+    // splats to min(R,G,B) in every channel.
+    f.appendChild(el('feBlend', { mode: 'darken', in: 'rr', in2: 'gg', result: 'rg' }));
+    f.appendChild(el('feBlend', { mode: 'darken', in: 'rg', in2: 'bb', result: 'white' }));
 
     const L = '0.2126 0.7152 0.0722 0 0 ';
     f.appendChild(el('feColorMatrix', {
-      type: 'matrix', result: 'luma',
+      in: 'SourceGraphic', type: 'matrix', result: 'lum',
       values: L + L + L + '0 0 0 0 1'
     }));
 
-    const ct = el('feComponentTransfer', { in: 'luma', result: 'gain' });
-    filters[id] = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
+    // guard slides the measure from pure white content towards luminance,
+    // so bright colour can be brought back under the ceiling if wanted.
+    const mix = el('feComposite', {
+      in: 'white', in2: 'lum', operator: 'arithmetic',
+      k1: '0', k2: '1', k3: '0', k4: '0', result: 'meas'
+    });
+    f.appendChild(mix);
+
+    const ct = el('feComponentTransfer', { in: 'meas', result: 'gain' });
+    const funcs = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
       const fn = el(tag, { type: 'table' });
       ct.appendChild(fn);
       return fn;
@@ -133,26 +160,30 @@
 
     svg.appendChild(f);
     document.body.appendChild(svg);
+    filters[id] = { funcs: funcs, mix: mix };
     return true;
   }
 
-  // gain(luma) = 1 below the ceiling, ceiling/luma above it. Strength eases
-  // the whole curve back towards 1, giving a ratio rather than a brickwall.
+  // gain(m) = 1 below the ceiling, ceiling/m above it. Strength eases the
+  // whole curve back towards 1, giving a ratio rather than a brickwall.
   function gainTable(c, s) {
     const out = [];
     for (let k = 0; k < NT; k++) {
-      const y = k / (NT - 1);
-      const g = y <= c ? 1 : c / y;
+      const m = k / (NT - 1);
+      const g = m <= c ? 1 : c / m;
       out.push((1 - s * (1 - g)).toFixed(4));
     }
     return out.join(' ');
   }
 
   function setTable(id, c, s) {
-    const fns = filters[id];
-    if (!fns) return;
+    const e = filters[id];
+    if (!e) return;
+    const guard = clamp(cfg.colourGuard, 0, 1);
+    e.mix.setAttribute('k2', (1 - guard).toFixed(3));
+    e.mix.setAttribute('k3', guard.toFixed(3));
     const tv = gainTable(c, s);
-    for (const fn of fns) fn.setAttribute('tableValues', tv);
+    for (const fn of e.funcs) fn.setAttribute('tableValues', tv);
   }
 
   let lastCeilByte = -1;

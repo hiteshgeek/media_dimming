@@ -4,7 +4,7 @@ const FACTORY = {
   mode: 'clip',
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'filter', flashCeil: 0.45,
-  dimThumbs: true, thumbCeiling: 0.45, thumbStrength: 1.0,
+  colourGuard: 0, dimThumbs: true, thumbCeiling: 0.45, thumbStrength: 1.0,
   ceiling: 0.30, maxDim: 0.82, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
   holdMs: 400, peakWeight: 0.45, sampleHz: 50
