@@ -40,6 +40,9 @@
     minCeiling: 0.10,   // contrast adaptation never pushes below this
     clipEngine: 'blend', // 'blend' = darken layer | 'filter' = SVG curve on the video
     flashCeil: 0.45,    // ceiling multiplier during a flash
+    dimThumbs: true,    // apply the same ceiling to thumbnail images
+    thumbCeiling: 0.45, // thumbnails are static, so this needs no adaptation
+    thumbStrength: 1.0,
     ceiling: 0.35,      // whole-frame mode: target average level
     maxDim: 0.80,       // whole-frame mode: how far gain may go
     baseDim: 0.00,      // always-on global dim (both modes)
@@ -80,10 +83,10 @@
   // blended overlay does not reach the video (hardware overlay planes,
   // fullscreen compositing, a stacking context we did not anticipate).
   const NT = 17;   // table points; piecewise-linear between them
-  let funcs = null;
+  const filters = {};   // filter id -> its [feFuncR, feFuncG, feFuncB]
 
-  function buildFilter() {
-    if (funcs) return true;
+  function buildFilter(id) {
+    if (filters[id]) return true;
     // A filter: url() pointing at a filter that does not exist makes the
     // element not render at all, so never flag the class before this succeeds.
     if (!document.body) return false;
@@ -93,18 +96,26 @@
     svg.setAttribute('aria-hidden', 'true');
     svg.style.cssText = 'position:absolute;width:0;height:0;pointer-events:none';
     const f = document.createElementNS(NS, 'filter');
-    f.setAttribute('id', 'ml-clip');
+    f.setAttribute('id', id);
     // sRGB, not the linearRGB default, so the curve matches the blend maths
     f.setAttribute('color-interpolation-filters', 'sRGB');
     const ct = document.createElementNS(NS, 'feComponentTransfer');
-    funcs = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
+    filters[id] = ['feFuncR', 'feFuncG', 'feFuncB'].map(tag => {
       const fn = document.createElementNS(NS, tag);
       fn.setAttribute('type', 'table');
       ct.appendChild(fn);
       return fn;
     });
     f.appendChild(ct); svg.appendChild(f);
-    (document.body || document.documentElement).appendChild(svg);
+    document.body.appendChild(svg);
+    return true;
+  }
+
+  function setTable(id, c, s) {
+    const fns = filters[id];
+    if (!fns) return;
+    const tv = filterTable(c, s);
+    for (const fn of fns) fn.setAttribute('tableValues', tv);
   }
 
   function filterTable(c, s) {
@@ -122,9 +133,7 @@
     if (b === lastCeilByte) return;          // avoid redundant style writes
     lastCeilByte = b;
     if (cfg.clipEngine === 'filter') {
-      buildFilter();
-      const tv = filterTable(b / 255, clamp(cfg.clipStrength, 0, 1));
-      for (const fn of funcs) fn.setAttribute('tableValues', tv);
+      if (buildFilter('ml-clip')) setTable('ml-clip', b / 255, clamp(cfg.clipStrength, 0, 1));
     } else if (clipLayer) {
       clipLayer.style.backgroundColor = 'rgb(' + b + ',' + b + ',' + b + ')';
     }
@@ -136,8 +145,16 @@
     if (!cfg.enabled) setGain(1);
     const wantFilter = cfg.enabled && cfg.mode === 'clip' && !cfg.testMode
                        && cfg.clipEngine === 'filter';
-    root.classList.toggle('ml-clipfilter', wantFilter && buildFilter());
+    root.classList.toggle('ml-clipfilter', wantFilter && buildFilter('ml-clip'));
     lastCeilByte = -1;
+
+    // Thumbnails are static images, so they need no sampling - one transfer
+    // curve on the page handles every one of them, with no DOM injection.
+    const wantThumbs = cfg.enabled && cfg.dimThumbs && buildFilter('ml-thumbclip');
+    if (wantThumbs) {
+      setTable('ml-thumbclip', clamp(cfg.thumbCeiling, 0.05, 1), clamp(cfg.thumbStrength, 0, 1));
+    }
+    root.classList.toggle('ml-thumbs', !!wantThumbs);
     if (!clipLayer) return;
     // Test mode always uses the overlay, since proving attachment is its job.
     const useLayer = cfg.enabled && cfg.clipEngine !== 'filter'
@@ -252,6 +269,10 @@
     lastTick = ts;
     if (document.hidden) return;
 
+    // The page may have no video at all (a feed, search results), and the
+    // thumbnail curve must still be installed once the body exists.
+    if (cfg.dimThumbs && !filters['ml-thumbclip'] && document.body) applyStatic();
+
     let snap = false;
     const v = findVideo();
     state.hasVideo = !!v;
@@ -349,7 +370,7 @@
     if (msg && msg.type === 'ml-status') {
       respond({
         hasVideo: state.hasVideo,
-        attached: cfg.clipEngine === 'filter' ? !!funcs : state.attached,
+        attached: cfg.clipEngine === 'filter' ? !!filters['ml-clip'] : state.attached,
         readable: state.readable,
         selective: cfg.mode === 'clip',
         engine: cfg.clipEngine,

@@ -2,6 +2,7 @@ const DEFAULTS = {
   enabled: true, mode: 'clip', testMode: false,
   hardCeiling: 0.28, clipStrength: 1.0, areaComp: 0.55, flashCeil: 0.45,
   maxContrast: 3, minCeiling: 0.10, clipEngine: 'blend',
+  dimThumbs: true, thumbCeiling: 0.45, thumbStrength: 1.0,
   ceiling: 0.35, maxDim: 0.80, baseDim: 0.00,
   attackMs: 35, releaseMs: 1200, flashGuard: true, flashDelta: 0.12,
   holdMs: 400, peakWeight: 0.45, sampleHz: 50
@@ -25,6 +26,7 @@ const SLIDERS = {
   clipStrength: [v => v / 100, v => Math.round(v * 100), v => v >= 0.98 ? 'hard clip' : (1 / (1 - v)).toFixed(1) + ':1'],
   maxContrast:  [v => v / 10,  v => Math.round(v * 10),  v => v <= 0.05 ? 'off' : v.toFixed(1) + '× scene'],
   areaComp:     [v => v / 100, v => Math.round(v * 100), v => v <= 0.01 ? 'off' : Math.round(v * 100) + '%'],
+  thumbCeiling: [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   ceiling:      [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   maxDim:       [v => v / 100, v => Math.round(v * 100), v => Math.round(v * 100) + '%'],
   baseDim:      [v => v / 100, v => Math.round(v * 100), v => v <= 0.005 ? 'off' : Math.round(v * 100) + '%'],
@@ -81,6 +83,8 @@ function render() {
   $('enabled').checked = cfg.enabled;
   $('flashGuard').checked = cfg.flashGuard;
   $('testMode').checked = cfg.testMode;
+  $('dimThumbs').checked = cfg.dimThumbs;
+  $('thumbCeiling').disabled = !cfg.dimThumbs;
 
   document.body.dataset.mode = cfg.mode;
   $('seg').dataset.sel = cfg.mode === 'dim' ? '1' : '0';
@@ -174,6 +178,11 @@ $('enabled').addEventListener('change', async (e) => {
 $('flashGuard').addEventListener('change', async (e) => {
   CFG.flashGuard = e.target.checked;
   await chrome.storage.sync.set({ flashGuard: e.target.checked });
+  render();
+});
+$('dimThumbs').addEventListener('change', async (e) => {
+  CFG.dimThumbs = e.target.checked;
+  await chrome.storage.sync.set({ dimThumbs: e.target.checked });
   render();
 });
 $('testMode').addEventListener('change', async (e) => {

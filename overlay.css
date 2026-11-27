@@ -11,6 +11,31 @@ html.ml-active.ml-clipfilter video {
   filter: brightness(var(--ml-gain, 1)) url(#ml-clip) !important;
 }
 
+/* Thumbnails. Static images, so a single transfer curve clips every one of
+   them per pixel - no sampling, no DOM injection, nothing to re-attach when
+   YouTube rebuilds the feed. */
+html.ml-thumbs ytd-thumbnail img,
+html.ml-thumbs yt-image img,
+html.ml-thumbs img.yt-core-image,
+html.ml-thumbs yt-thumbnail-view-model img,
+html.ml-thumbs ytd-playlist-thumbnail img,
+html.ml-thumbs ytd-rich-grid-media img,
+html.ml-thumbs ytd-compact-video-renderer img,
+html.ml-thumbs ytd-channel-renderer img,
+html.ml-thumbs ytd-post-renderer img,
+html.ml-thumbs #thumbnail img {
+  filter: url(#ml-thumbclip);
+}
+
+/* The player runs its own limiting, so keep the thumbnail curve out of it -
+   including the scrubber preview, which would otherwise be clipped twice. */
+html.ml-thumbs #movie_player img,
+html.ml-thumbs .html5-video-container img,
+html.ml-thumbs .ytp-storyboard-framepreview img,
+html.ml-thumbs .ytp-tooltip img {
+  filter: none !important;
+}
+
 /* Optional ceiling layer: `darken` composites to min(video, grey) per channel,
    a hard brickwall on highlights that leaves dark pixels untouched. */
 .ml-clip-layer {

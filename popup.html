@@ -310,12 +310,6 @@
         <input type="range" id="hardCeiling" min="8" max="100" step="1">
       </div>
 
-      <div class="ctl">
-        <div class="lbl"><label for="clipStrength">Clip hardness</label><span class="v" id="clipStrengthv"></span></div>
-        <input type="range" id="clipStrength" min="20" max="100" step="1">
-        <p class="hint">Softer keeps bright-area detail, but passes more light.</p>
-      </div>
-
     </section>
 
     <section class="only-dim">
@@ -332,9 +326,33 @@
       </div>
     </section>
 
+
+    <details id="thumbsec">
+      <summary>Thumbnails</summary>
+      <div class="dbody">
+        <label class="tgl">
+          <input type="checkbox" id="dimThumbs">
+          <span class="track"><span class="knob"></span></span>
+          <span class="tgl-l">Dim thumbnails</span>
+        </label>
+        <p class="hint">Applies the same per-pixel ceiling to thumbnail images across YouTube. They are static, so this needs no scene adaptation.</p>
+
+        <div class="ctl">
+          <div class="lbl"><label for="thumbCeiling">Thumbnail ceiling</label><span class="v" id="thumbCeilingv"></span></div>
+          <input type="range" id="thumbCeiling" min="8" max="100" step="1">
+        </div>
+      </div>
+    </details>
+
     <details>
       <summary>Fine tuning</summary>
       <div class="dbody">
+
+      <div class="ctl only-clip">
+        <div class="lbl"><label for="clipStrength">Clip hardness</label><span class="v" id="clipStrengthv"></span></div>
+        <input type="range" id="clipStrength" min="20" max="100" step="1">
+        <p class="hint">Softer keeps bright-area detail, but passes more light.</p>
+      </div>
 
       <div class="ctl only-clip">
         <div class="lbl"><label for="maxContrast">Dark scene limit</label><span class="v" id="maxContrastv"></span></div>
