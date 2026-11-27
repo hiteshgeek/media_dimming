@@ -23,6 +23,23 @@
   backdrop-filter: invert(1) hue-rotate(180deg);
   -webkit-backdrop-filter: invert(1) hue-rotate(180deg);
 }
+/* Regions that were already dark get inverted a second time, which returns
+   them to how they looked. A page with a dark sidebar beside light content
+   then keeps the sidebar dark instead of flipping it to white. */
+html.ml-darkpage .ml-keep {
+  filter: invert(1) hue-rotate(180deg);
+}
+/* Media inside a kept region needs no pre-inversion: the region already
+   cancels the veil, so inverting again would flip the picture. */
+html.ml-darkpage .ml-keep img,
+html.ml-darkpage .ml-keep video,
+html.ml-darkpage .ml-keep canvas,
+html.ml-darkpage .ml-keep picture,
+html.ml-darkpage .ml-keep iframe,
+html.ml-darkpage .ml-keep [style*="background-image"] {
+  filter: none;
+}
+
 html.ml-darkpage img,
 html.ml-darkpage video,
 html.ml-darkpage canvas,

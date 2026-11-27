@@ -110,10 +110,40 @@
     return 1;   // nothing opaque found, assume the canvas white
   }
 
+  // Inverting the whole viewport flips regions that were already dark - a
+  // dark sidebar beside light content turns white. Mark those regions so the
+  // stylesheet can invert them a second time and hand them back unchanged.
+  function parseRGB(c) {
+    const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(c || '');
+    if (!m) return null;
+    return { l: (0.2126 * +m[1] + 0.7152 * +m[2] + 0.0722 * +m[3]) / 255,
+             a: m[4] === undefined ? 1 : +m[4] };
+  }
+
+  function markDarkRegions() {
+    if (!document.body) return;
+    for (const el of document.querySelectorAll('.ml-keep')) el.classList.remove('ml-keep');
+    if (cfg.pageMode !== 'dark' || !veil) return;
+
+    const minArea = innerWidth * innerHeight * 0.015;   // ignore chips and badges
+    const all = document.body.querySelectorAll('*');
+    const cap = Math.min(all.length, 4000);             // bounded: this runs on a timer
+    for (let i = 0; i < cap; i++) {
+      const el = all[i];
+      // offset* is cheap next to getComputedStyle, so screen on size first
+      if (el.offsetWidth * el.offsetHeight < minArea) continue;
+      if (el.closest('.ml-keep')) continue;             // already inside a kept region
+      const bg = parseRGB(getComputedStyle(el).backgroundColor);
+      if (!bg || bg.a < 0.9 || bg.l >= 0.25) continue;
+      el.classList.add('ml-keep');
+    }
+  }
+
   let darkCache = { at: -1e9, dark: false };
   function pageIsDark() {
+    if (!document.body) return false;        // nothing painted yet, do not cache
     const now = Date.now();
-    if (now - darkCache.at < 1500) return darkCache.dark;
+    if (now - darkCache.at < 700) return darkCache.dark;
     const dark = bgLuma() < 0.25;
     darkCache = { at: now, dark: dark };
     return dark;
@@ -416,20 +446,11 @@
     return Math.abs(target - next) < 0.004 ? target : next;
   }
 
-  let lastSchedCheck = -1e9, active = false;
+  let lastSchedCheck = -1e9, active = false, wasDark = false;
 
   function tick(ts) {
     requestAnimationFrame(tick);
 
-    // No event fires when the clock crosses the window edge, so poll it. Two
-    // seconds is far finer than a one-minute boundary needs.
-    if (ts - lastSchedCheck > 2000) {
-      lastSchedCheck = ts;
-      const now = isActive();
-      if (now !== active) { active = now; applyStatic(); }
-      // a page may replace body wholesale, so re-assert the veil
-      else if (active && !isYT && (!veil || !veil.isConnected)) applyStatic();
-    }
     if (!active) return;
     if (!isYT) return;          // ordinary sites need nothing per frame
     const interval = 1000 / Math.max(10, Math.min(60, cfg.sampleHz));
@@ -540,7 +561,24 @@
   // synchronous implementation would otherwise run before the consts exist.
   chrome.storage.sync.get(DEFAULTS, (v) => { cfg = { ...DEFAULTS, ...v }; applyStatic(); });
 
+  function watch() {
+    const now = isActive();
+    const dk = !isYT && !!cfg.skipDark && pageIsDark();
+    if (now !== active || dk !== wasDark) {
+      active = now; wasDark = dk;
+      applyStatic();
+    } else if (active && !dk && !isYT && (!veil || !veil.isConnected)) {
+      applyStatic();     // the page may have replaced body wholesale
+    }
+    if (active && !isYT && veil && cfg.pageMode === 'dark') markDarkRegions();
+  }
+
   applyStatic();
+  watch();
+  // A page is judged light at document_start because nothing is painted yet,
+  // so that first verdict has to be revisited; a site flipping its own dark
+  // mode has to be caught too. Neither raises an event.
+  setInterval(watch, 1000);
   requestAnimationFrame(tick);
 
   document.addEventListener('yt-navigate-finish', () => {
