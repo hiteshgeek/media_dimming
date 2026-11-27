@@ -112,3 +112,29 @@ html.ml-thumbs .ytp-tooltip img {
   mix-blend-mode: normal !important;
   opacity: 0.4 !important;
 }
+
+/* Pictures and video on ordinary sites get the same white-clipping curve as
+   YouTube thumbnails, so a blazing white photo is capped while its colour is
+   left alone.
+
+   In dark mode the media also carries the inversion that cancels the veil, and
+   order matters: clip first on the real colours, invert afterwards. Inside a
+   kept region the region already cancels the veil, so only the clip applies. */
+html.ml-pagemedia img,
+html.ml-pagemedia video,
+html.ml-pagemedia canvas,
+html.ml-pagemedia picture {
+  filter: url(#ml-thumbclip);
+}
+html.ml-pagemedia.ml-darkpage img,
+html.ml-pagemedia.ml-darkpage video,
+html.ml-pagemedia.ml-darkpage canvas,
+html.ml-pagemedia.ml-darkpage picture {
+  filter: url(#ml-thumbclip) invert(1) hue-rotate(180deg);
+}
+html.ml-pagemedia.ml-darkpage .ml-keep img,
+html.ml-pagemedia.ml-darkpage .ml-keep video,
+html.ml-pagemedia.ml-darkpage .ml-keep canvas,
+html.ml-pagemedia.ml-darkpage .ml-keep picture {
+  filter: url(#ml-thumbclip);
+}

@@ -110,9 +110,14 @@
     return 1;   // nothing opaque found, assume the canvas white
   }
 
-  // Inverting the whole viewport flips regions that were already dark - a
-  // dark sidebar beside light content turns white. Mark those regions so the
-  // stylesheet can invert them a second time and hand them back unchanged.
+  // Inverting the whole viewport flips every region in it, which is only
+  // wanted for the near-white ones. Inversion maps mid-grey to mid-grey, so a
+  // 45% grey nav bar comes out grey but now sits against black content and
+  // looks wrong, and a dark sidebar turns white outright.
+  //
+  // So mark everything that is NOT near-white and invert it a second time,
+  // handing it back exactly as the site drew it. Only genuinely bright
+  // surfaces end up inverted.
   function parseRGB(c) {
     const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/.exec(c || '');
     if (!m) return null;
@@ -120,12 +125,18 @@
              a: m[4] === undefined ? 1 : +m[4] };
   }
 
+  // Anything at or above this is treated as a bright surface and inverted.
+  // Below it, the site's own colour is kept.
+  const INVERT_ABOVE = 0.62;
+
   function markDarkRegions() {
     if (!document.body) return;
     for (const el of document.querySelectorAll('.ml-keep')) el.classList.remove('ml-keep');
     if (cfg.pageMode !== 'dark' || !veil) return;
 
-    const minArea = innerWidth * innerHeight * 0.015;   // ignore chips and badges
+    // Small floating chrome - a "back to top" pill, a toast - is worth
+    // preserving too, so the screen is far looser than a panel-sized one.
+    const minArea = innerWidth * innerHeight * 0.003;
     const all = document.body.querySelectorAll('*');
     const cap = Math.min(all.length, 4000);             // bounded: this runs on a timer
     for (let i = 0; i < cap; i++) {
@@ -134,7 +145,7 @@
       if (el.offsetWidth * el.offsetHeight < minArea) continue;
       if (el.closest('.ml-keep')) continue;             // already inside a kept region
       const bg = parseRGB(getComputedStyle(el).backgroundColor);
-      if (!bg || bg.a < 0.9 || bg.l >= 0.25) continue;
+      if (!bg || bg.a < 0.9 || bg.l >= INVERT_ABOVE) continue;
       el.classList.add('ml-keep');
     }
   }
@@ -327,11 +338,22 @@
     if (!want) {
       if (veil) { veil.remove(); veil = null; }
       root.classList.remove('ml-darkpage');
+      root.classList.remove('ml-pagemedia');
+      for (const el of document.querySelectorAll('.ml-keep')) el.classList.remove('ml-keep');
       return;
     }
     const whites = cfg.pageMode === 'white';
     const darkMode = cfg.pageMode === 'dark';
     root.classList.toggle('ml-darkpage', darkMode);
+
+    // Same white-clipping curve as the YouTube thumbnails, applied to pictures
+    // and video everywhere else.
+    const media = cfg.dimThumbs && buildFilter('ml-thumbclip');
+    if (media) {
+      setTable('ml-thumbclip', clamp(cfg.thumbCeiling, 0.05, 1),
+               clamp(cfg.thumbStrength, 0, 1));
+    }
+    root.classList.toggle('ml-pagemedia', !!media);
     if (whites) {
       if (!buildFilter('ml-page')) return;    // nothing to reference yet
       setTable('ml-page', clamp(cfg.pageCeiling, 0.05, 1), 1);
