@@ -267,6 +267,17 @@
   body[data-mode="clip"] .only-dim  { display: none; }
   body[data-mode="dim"]  .only-clip { display: none; }
   #panel.off { opacity: .35; pointer-events: none; filter: saturate(.4); }
+  /* Outside the schedule nothing is applied, but the settings stay editable,
+     so this fades without blocking input the way .off does. */
+  #panel.asleep { opacity: .62; filter: saturate(.75); }
+  .sleepbar {
+    display: flex; align-items: center; gap: 8px;
+    margin: 10px 0 0; padding: 8px 11px; border-radius: 9px;
+    background: rgba(232,163,61,.12); border: 1px solid rgba(232,163,61,.4);
+    color: #e8a33d; font-size: 11.5px; line-height: 1.35;
+  }
+  .sleepbar[hidden] { display: none; }
+  .sleepbar b { font-weight: 600; }
   #panel { transition: opacity .2s, filter .2s; }
 </style>
 </head>
@@ -292,6 +303,10 @@
     <label class="tgl" title="Enable / disable">
       <input type="checkbox" id="enabled"><span class="track"><span class="knob"></span></span>
     </label>
+  </div>
+
+  <div class="wrap">
+    <p class="sleepbar" id="sleepbar" hidden></p>
   </div>
 
   <div class="wrap" id="panel">

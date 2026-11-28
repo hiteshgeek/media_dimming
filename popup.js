@@ -157,6 +157,7 @@ function render() {
   }
 
   $('panel').classList.toggle('off', !cfg.enabled);
+  $('panel').classList.toggle('asleep', cfg.enabled && !inWindow(cfg));
 
   for (const k of ['night', 'custom', 'always']) {
     $('s-' + k).classList.toggle('sel', cfg.schedule === k);
@@ -165,8 +166,18 @@ function render() {
   $('startT').value = hhmm(cfg.startMin);
   $('endT').value = hhmm(cfg.endMin);
   const w = windowOf(cfg);
-  $('schedsum').textContent = w ? pretty(w[0]) + ' – ' + pretty(w[1]) : 'all day';
   const live = inWindow(cfg);
+  const asleep = cfg.enabled && !live;
+  $('schedsum').textContent = (w ? pretty(w[0]) + ' – ' + pretty(w[1]) : 'all day')
+    + (asleep ? '  ·  asleep' : '');
+  const sb = $('sleepbar');
+  if (sb) {
+    sb.hidden = !asleep;
+    if (asleep) {
+      sb.innerHTML = 'Asleep until <b>' + pretty(w[0])
+        + '</b> — nothing is being dimmed. Switch Schedule to <b>All day</b> to override.';
+    }
+  }
   $('schedstate').textContent = !cfg.enabled ? 'Turned off by the main switch.'
     : live ? 'Within the window now, so it is running.'
     : 'Outside the window, so it is off until ' + pretty(w[0]) + '.';
@@ -404,7 +415,7 @@ async function poll() {
       HERE_DARK = !!r.pageDark;
       renderSites();
     }
-    if (r.active === false) setStatus('warn', 'Outside the schedule — not dimming');
+    if (r.active === false) setStatus('warn', 'Asleep — outside the schedule');
     else if (!r.hasVideo) setStatus('', 'No video on this tab');
     else if (!r.attached) setStatus('bad', 'Layer not attached to the player');
     else if (!r.readable) setStatus('warn', 'Pixels unreadable (DRM) — ceiling still applies');
@@ -412,7 +423,10 @@ async function poll() {
   } catch (e) {
     $('areav').textContent = '';
     $('ceilmark').style.opacity = '0';
-    setStatus('', 'Not connected — open or reload a YouTube tab');
+    setStatus(CFG.enabled && !inWindow(CFG) ? 'warn' : '',
+      CFG.enabled && !inWindow(CFG)
+        ? 'Asleep — outside the schedule'
+        : 'Not connected — open or reload a tab');
   }
 }
 

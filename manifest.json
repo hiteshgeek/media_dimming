@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Media Layer \u2014 Brightness Limiter",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "Dims glaring white on YouTube and every other site, on a night schedule. Colour is left alone.",
   "permissions": [
     "storage"
