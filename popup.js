@@ -174,8 +174,8 @@ function render() {
   if (sb) {
     sb.hidden = !asleep;
     if (asleep) {
-      sb.innerHTML = 'Asleep until <b>' + pretty(w[0])
-        + '</b> — nothing is being dimmed. Switch Schedule to <b>All day</b> to override.';
+      sb.innerHTML = '<b>Asleep until ' + pretty(w[0]) + '</b>'
+        + 'Nothing is being dimmed right now. Set Schedule to “All day” to override.';
     }
   }
   $('schedstate').textContent = !cfg.enabled ? 'Turned off by the main switch.'
